@@ -12,9 +12,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import sys
+import warnings
+
+# Suppress framework noise, experimental feature warnings, and client notices
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+logging.getLogger("google").setLevel(logging.ERROR)
+logging.getLogger("google.genai").setLevel(logging.ERROR)
+logging.getLogger("google.adk").setLevel(logging.ERROR)
 
 from rich.console import Console
+from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.rule import Rule
 from rich.table import Table
@@ -119,7 +129,7 @@ def main() -> int:
 
     # Print final response
     console.print(Rule("🧘 Practice Plan", style="magenta"))
-    console.print(result.final_response)
+    console.print(Markdown(result.final_response))
 
     # Print trace summary
     if not args.no_trace:
