@@ -167,15 +167,39 @@ Every run produces a JSON trace file at `data/traces/<run_id>.json` matching PLA
 
 ## What Phase 1 Does NOT Include
 
-Per PLAN.md "Do Not Build Yet":
+Per PLAN.md §35 (Phase 1 scope boundary):
+
+**Deferred to Phase 2:**
 - ❌ Safety & Constraint Agent
-- ❌ Critic / Reflection Agent  
-- ❌ PostgreSQL / pgvector (static in-memory corpus only)
-- ❌ MCP server
+- ❌ Critic / Reflection Agent
+- ❌ PostgreSQL / pgvector (static in-memory corpus only in Phase 1)
+- ❌ MCP server integration
 - ❌ Persistent memory / database
+- ❌ Model gateway abstraction (multi-provider)
+- ❌ Working frontend (Next.js)
+
+**Deferred to Phase 3 — [§31 Multi-Model Intelligence & Dynamic Model Routing](PLAN.md):**
+- ❌ Model Capability Registry
+- ❌ Dynamic model routing with scoring engine (§31.1–31.4)
+- ❌ Model cascading / escalation (§31.8)
+- ❌ Parallel model execution (§31.6)
+- ❌ Multi-provider support: GPT, Claude, DeepSeek, Qwen, Kimi (§31.7)
+- ❌ Multi-model routing experiments A/B/C/D (§31.9)
+- ❌ Latency budget enforcement with 30s ceiling (§31.5)
+
+**Deferred to Phase 3 — [§32 Containerized Runtime](PLAN.md):**
+- ❌ Docker Compose production runtime
+- ❌ Model gateway, RAG caching, connection pooling
+- ❌ OpenTelemetry collector + observability dashboard
+
+**Deferred to Phase 3 — [§34 Updated Evaluation Strategy](PLAN.md):**
+- ❌ 40+ persona-linked evaluation runs
+- ❌ Architecture comparison (sequential vs broadcast vs blackboard vs hierarchical)
+- ❌ Model-routing experiment matrix
+- ❌ p95 latency benchmarking against 30-second ceiling
+
+**Never built:**
 - ❌ Tree of Thought candidate planning
-- ❌ Frontend (Next.js)
-- ❌ Architecture benchmarking
 - ❌ Production deployment
 
 ---

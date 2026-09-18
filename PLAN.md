@@ -225,14 +225,14 @@ separated responsibilities.
 
 A later Phase 3 may add:
 
-  -----------------------------------------------------------------------
-  Agent                               Responsibility
-  ----------------------------------- -----------------------------------
-  **Pose Understanding Agent**        Analyze image-derived pose
-                                      landmarks/features and provide
-                                      non-clinical practice feedback
+  ---------------------------------------------------------------------
+  Agent                              Responsibility
+  ---------------------------------- ----------------------------------
+  **Pose Understanding Agent**       Analyze image-derived pose
+                                     landmarks/features and provide
+                                     non-clinical practice feedback
 
-  -----------------------------------------------------------------------
+  ---------------------------------------------------------------------
 
 The project deliberately avoids excessive agent decomposition. Each
 agent must have a measurable responsibility and a clear reason for
@@ -293,58 +293,58 @@ observable and dynamic environment**.
 
 ### Environment Characteristics
 
-  -----------------------------------------------------------------------
-  Property                            YogaSutra Interpretation
-  ----------------------------------- -----------------------------------
-  Observability                       **Partially observable** --- the
-                                      system does not know the complete
-                                      user state
+  ---------------------------------------------------------------------
+  Property                           YogaSutra Interpretation
+  ---------------------------------- ----------------------------------
+  Observability                      **Partially observable** --- the
+                                     system does not know the complete
+                                     user state
 
-  Determinism                         **Uncertain / stochastic** --- user
-                                      responses and preferences are not
-                                      fully predictable
+  Determinism                        **Uncertain / stochastic** ---
+                                     user responses and preferences are
+                                     not fully predictable
 
-  Time structure                      **Sequential** --- previous
-                                      sessions can influence future
-                                      recommendations
+  Time structure                     **Sequential** --- previous
+                                     sessions can influence future
+                                     recommendations
 
-  Dynamics                            **Dynamic** --- user goals,
-                                      preferences and context can change
+  Dynamics                           **Dynamic** --- user goals,
+                                     preferences and context can change
 
-  State space                         Large and partly continuous
+  State space                        Large and partly continuous
 
-  Agents                              Multiple specialized agents
+  Agents                             Multiple specialized agents
 
-  Interaction                         Human-agent and agent-agent
+  Interaction                        Human-agent and agent-agent
 
-  Goal structure                      Explicit user goals + system
-                                      constraints
-  -----------------------------------------------------------------------
+  Goal structure                     Explicit user goals + system
+                                     constraints
+  ---------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
 # 8. PEAS Specification
 
-  -----------------------------------------------------------------------
-  Component                           YogaSutra Definition
-  ----------------------------------- -----------------------------------
-  **Performance**                     Goal alignment, personalization,
-                                      grounding, constraint satisfaction,
-                                      safety compliance, coherence,
-                                      latency, user feedback
+  ---------------------------------------------------------------------
+  Component                          YogaSutra Definition
+  ---------------------------------- ----------------------------------
+  **Performance**                    Goal alignment, personalization,
+                                     grounding, constraint
+                                     satisfaction, safety compliance,
+                                     coherence, latency, user feedback
 
-  **Environment**                     User profile, goals, preferences,
-                                      available time, prior sessions,
-                                      feedback, yoga knowledge corpus
+  **Environment**                    User profile, goals, preferences,
+                                     available time, prior sessions,
+                                     feedback, yoga knowledge corpus
 
-  **Actuators**                       Ask questions, retrieve knowledge,
-                                      generate plans, validate plans,
-                                      revise outputs, record feedback
+  **Actuators**                      Ask questions, retrieve knowledge,
+                                     generate plans, validate plans,
+                                     revise outputs, record feedback
 
-  **Sensors / Percepts**              Text, voice, profile data, session
-                                      history, feedback, image input,
-                                      retrieved documents
-  -----------------------------------------------------------------------
+  **Sensors / Percepts**             Text, voice, profile data, session
+                                     history, feedback, image input,
+                                     retrieved documents
+  ---------------------------------------------------------------------
 
 The PEAS model provides the formal problem definition for the agent
 system and establishes the basis for subsequent evaluation.
@@ -1191,33 +1191,774 @@ one architecture is inherently superior.
 
 ------------------------------------------------------------------------
 
-# 31. LLM / Model Comparison
+# 31. Multi-Model Intelligence & Dynamic Model Routing
 
-Different agents may not require identical models.
+YogaSutra will **not be tied to a single LLM provider**.
 
-The project may evaluate model configurations based on:
+The final system will use a **multi-model architecture** in which
+different tasks can be routed to different model families according to
+the requirements of the task.
 
--   quality;
--   latency;
--   token usage;
--   tool-use reliability;
--   grounding;
--   planning quality.
+Candidate providers/model families include:
 
-Potential initial configuration:
+-   OpenAI GPT
+-   Anthropic Claude
+-   Google Gemini
+-   DeepSeek
+-   Qwen
+-   Kimi / Moonshot
+-   other compatible models added through the model registry
 
-  Agent             Candidate Model
-  ----------------- -----------------------------------------
-  Root Manager      Gemini Flash
-  Profile Agent     Gemini Flash-Lite
-  Knowledge Agent   Gemini Flash-Lite / Flash
-  Planner           Gemini Flash
-  Safety Agent      Gemini Flash-Lite + deterministic rules
-  Critic            Gemini Flash
+The exact model IDs will be selected and benchmarked during
+implementation because model availability, pricing, latency and
+capabilities change over time.
 
-The final assignment will be based on measured results.
+The architecture therefore treats **models as interchangeable execution
+resources**, rather than embedding one model directly into every agent.
+
+## 31.1 Master Agent / Model Router
+
+The Root Manager will be extended with a **Model Routing Layer**.
+
+The routing process is:
+
+``` mermaid
+flowchart TD
+    U["User Request"] --> M["Master Agent / Root Manager"]
+
+    M --> T["Task Classification"]
+    T --> R["Requirement Extraction"]
+
+    R --> REQ["Task Requirements"]
+
+    REQ --> REG[("Model Capability Registry")]
+    REG --> C["Candidate Models"]
+
+    C --> SC["Routing / Scoring Engine"]
+    REQ --> SC
+
+    SC --> SEL["Selected Model + Agent"]
+
+    SEL --> A["Specialized Agent"]
+    A --> O["Output"]
+
+    O --> V["Validation / Critic"]
+
+    V -->|Accept| F["Final Response"]
+    V -->|Retry / Escalate| SC
+```
+
+The Master Agent decides:
+
+1.  **which specialist agent should run;**
+2.  **whether the task requires a model call at all;**
+3.  **which model family should execute the task;**
+4.  **what reasoning effort is appropriate;**
+5.  **whether a faster/cheaper model is sufficient;**
+6.  **whether a stronger model is required;**
+7.  **whether the result should be escalated to another model.**
+
+The router should not simply choose the "most powerful" model. It should
+optimize for **task quality subject to latency and resource
+constraints**.
 
 ------------------------------------------------------------------------
+
+## 31.2 Model Capability Registry
+
+Every available model will have a machine-readable capability profile.
+
+Example:
+
+``` json
+{
+  "model_id": "provider/model-name",
+  "provider": "example-provider",
+  "capabilities": {
+    "reasoning": 4,
+    "tool_use": true,
+    "structured_output": true,
+    "vision": true,
+    "long_context": true
+  },
+  "context_window": 1000000,
+  "max_output_tokens": 128000,
+  "latency": {
+    "p50_ms": 1200,
+    "p95_ms": 3000
+  },
+  "cost": {
+    "input_per_million": 0.0,
+    "output_per_million": 0.0
+  },
+  "reliability": 0.98
+}
+```
+
+The registry will be periodically refreshed using provider metadata and
+internal benchmark measurements.
+
+------------------------------------------------------------------------
+
+## 31.3 Routing Parameters
+
+Model selection will consider multiple parameters rather than a single
+intelligence score.
+
+### Task Requirements
+
+-   required reasoning depth;
+-   expected output complexity;
+-   context size;
+-   structured-output requirement;
+-   tool-calling requirement;
+-   multimodal requirement;
+-   retrieval-grounding requirement;
+-   response length;
+-   precision requirement.
+
+### Model Characteristics
+
+-   reasoning capability;
+-   context window;
+-   tool-call reliability;
+-   structured-output reliability;
+-   multimodal support;
+-   measured latency;
+-   throughput;
+-   token cost;
+-   historical task accuracy;
+-   historical failure rate;
+-   provider availability.
+
+### Runtime Constraints
+
+-   current queue/load;
+-   remaining latency budget;
+-   retry budget;
+-   API availability;
+-   token budget.
+
+------------------------------------------------------------------------
+
+## 31.4 Routing Score
+
+A normalized routing score can be used to select among eligible models:
+
+$$
+Score(m,t) =
+w_q Q(m,t)
++ w_r R(m,t)
++ w_c C(m,t)
++ w_o O(m,t)
++ w_v V(m,t)
+- w_l L(m)
+- w_k K(m)
+$$
+
+Where:
+
+-   $Q$ = expected task quality;
+-   $R$ = reasoning suitability;
+-   $C$ = context suitability;
+-   $O$ = output/tool capability;
+-   $V$ = historical reliability;
+-   $L$ = measured latency;
+-   $K$ = estimated token/API cost.
+
+The weights are configurable by task class.
+
+This is a **software routing objective**, not a claim that one model is
+universally superior.
+
+------------------------------------------------------------------------
+
+## 31.5 Latency Budget
+
+The final system will target:
+
+> **End-to-end latency ≤ 30 seconds**
+
+30 seconds is treated as a generous hard ceiling rather than the
+performance target.
+
+The engineering objective is:
+
+> **Minimize latency while preserving task quality and grounding.**
+
+The system should maintain an internal latency budget, for example:
+
+``` text
+Total budget:                 30 s
+Target operating range:       < 10–15 s
+Routing / orchestration:       < 1 s
+RAG retrieval:                 < 1.5 s
+Primary model calls:           parallel where possible
+Validation / critic:           < 4 s
+Final synthesis:               < 3 s
+Reserved retry budget:         remaining time
+```
+
+These numbers are initial engineering targets and will be replaced by
+measured benchmarks.
+
+The router should avoid unnecessary sequential model calls.
+
+------------------------------------------------------------------------
+
+## 31.6 Parallel Model Execution
+
+Independent tasks should execute concurrently.
+
+``` mermaid
+flowchart TD
+    R["Master Agent"] --> P["Profile Task"]
+    R --> K["Knowledge Task"]
+    R --> C["Constraint Task"]
+
+    P --> PM["Selected Model"]
+    K --> KM["Selected Model"]
+    C --> CM["Selected Model"]
+
+    PM --> S["Planner / Synthesizer"]
+    KM --> S
+    CM --> S
+
+    S --> V["Validation"]
+    V --> F["Final Response"]
+```
+
+This allows the system to use different models for different subtasks
+without multiplying latency unnecessarily.
+
+------------------------------------------------------------------------
+
+## 31.7 Model Specialization
+
+The final mapping will be **learned from benchmarks**, not hard-coded
+permanently.
+
+An initial hypothesis is:
+
+  -----------------------------------------------------------------------
+  Task Type                           Candidate Model Classes
+  ----------------------------------- -----------------------------------
+  Fast profile extraction             Low-latency / low-cost model
+
+  Simple classification               Fast model
+
+  RAG query rewriting                 Fast model
+
+  Knowledge synthesis                 Strong tool/RAG-capable model
+
+  Complex practice planning           Strong reasoning model
+
+  Safety validation                   Fast model + deterministic rules,
+                                      escalated when needed
+
+  Critic / reflection                 Strong reasoning model when
+                                      complexity warrants it
+
+  Long-context synthesis              Long-context model
+
+  Vision / pose analysis              Strong multimodal model
+
+  Final response formatting           Fast structured-output model
+  -----------------------------------------------------------------------
+
+The project will benchmark candidates from GPT, Claude, Gemini,
+DeepSeek, Qwen and Kimi/Moonshot where API access and project resources
+permit.
+
+------------------------------------------------------------------------
+
+## 31.8 Model Cascading
+
+The system will support escalation.
+
+``` mermaid
+flowchart LR
+    A["Task"] --> F["Fast / Low-Cost Model"]
+    F --> V["Quality Check"]
+
+    V -->|Sufficient| O["Accept"]
+    V -->|Insufficient| S["Stronger Model"]
+
+    S --> V2["Quality Check"]
+    V2 -->|Pass| O
+    V2 -->|Fail| H["Human / Clarification / Safe Fallback"]
+```
+
+This allows routine tasks to remain fast while difficult tasks receive
+additional inference capacity.
+
+------------------------------------------------------------------------
+
+## 31.9 Model Routing Experiments
+
+The project will compare:
+
+### Experiment A --- Single Model
+
+Every agent uses the same model.
+
+### Experiment B --- Static Multi-Model
+
+Each agent has a fixed model selected before execution.
+
+### Experiment C --- Dynamic Routing
+
+The Master Agent chooses a model per task.
+
+### Experiment D --- Dynamic Routing + Cascade
+
+The system starts with a fast model and escalates only when quality or
+complexity requires it.
+
+Metrics:
+
+-   task quality;
+-   grounding;
+-   constraint satisfaction;
+-   latency;
+-   p50/p95 latency;
+-   token usage;
+-   estimated API cost;
+-   model-call count;
+-   retry count;
+-   escalation rate;
+-   failure rate.
+
+The final project should report whether dynamic routing actually
+provides a useful quality/latency trade-off.
+
+------------------------------------------------------------------------
+
+# 32. Containerized Runtime & Performance Architecture
+
+Docker is a **runtime and performance component**, not merely a
+packaging format.
+
+The final application will use Docker Compose to run the major project
+services consistently and concurrently.
+
+## 32.1 Runtime Architecture
+
+``` mermaid
+flowchart TB
+    UI["Next.js Frontend Container"] --> API["FastAPI + ADK Container"]
+
+    API --> ROUTER["Model Router"]
+    ROUTER --> G["Model Gateway"]
+
+    G --> GPT["OpenAI"]
+    G --> CL["Anthropic"]
+    G --> GE["Google Gemini"]
+    G --> DS["DeepSeek"]
+    G --> QW["Qwen"]
+    G --> KM["Kimi / Moonshot"]
+
+    API --> RAG["RAG Service"]
+    RAG --> PG[("PostgreSQL + pgvector")]
+
+    API --> MCP["MCP Server"]
+
+    API --> MEM[("Persistent Memory")]
+
+    API --> OBS["OpenTelemetry Collector"]
+
+    OBS --> TRACE["Trace / Metrics Backend"]
+
+    RAG --> CACHE["Cache"]
+
+    subgraph DOCKER["Docker Compose Runtime"]
+        API
+        ROUTER
+        G
+        RAG
+        MCP
+        PG
+        MEM
+        CACHE
+        OBS
+        UI
+    end
+```
+
+External model providers remain external APIs; Docker controls the
+application's **routing, orchestration, retrieval, caching, MCP,
+observability and frontend/backend runtime**.
+
+------------------------------------------------------------------------
+
+## 32.2 Model Gateway
+
+A unified model gateway will sit between the agents and external
+providers.
+
+Conceptually:
+
+``` text
+Agent
+  ↓
+Model Router
+  ↓
+Model Gateway
+  ├── OpenAI adapter
+  ├── Anthropic adapter
+  ├── Gemini adapter
+  ├── DeepSeek adapter
+  ├── Qwen adapter
+  └── Kimi adapter
+```
+
+A gateway abstraction prevents provider-specific logic from leaking into
+every agent.
+
+The implementation may use a compatible model gateway such as LiteLLM or
+a small project-specific adapter layer, depending on the final
+dependency decision.
+
+------------------------------------------------------------------------
+
+## 32.3 Docker Services
+
+The initial production-like Compose environment should contain:
+
+``` text
+frontend
+api
+model-router
+mcp-server
+rag
+postgres
+cache
+otel-collector
+```
+
+A local inference service may be added only where it provides a
+measurable benefit.
+
+Potential optional service:
+
+``` text
+local-model-runtime
+```
+
+for compatible open-weight models when local inference is useful for
+low-latency or privacy-sensitive lightweight tasks.
+
+------------------------------------------------------------------------
+
+## 32.4 Docker for Performance
+
+Docker will be used to make the runtime **efficient and reproducible**,
+not simply portable.
+
+Performance techniques include:
+
+-   concurrent service execution;
+-   persistent database connections;
+-   connection pooling;
+-   RAG result caching;
+-   model response caching where safe;
+-   asynchronous FastAPI execution;
+-   parallel independent agent calls;
+-   HTTP connection reuse;
+-   warm service processes;
+-   bounded retries;
+-   timeout budgets;
+-   lightweight containers;
+-   preloaded RAG/index resources;
+-   centralized model gateway;
+-   OpenTelemetry timing;
+-   health checks.
+
+The system should not create a new container or process for every agent
+invocation.
+
+------------------------------------------------------------------------
+
+## 32.5 Latency-Aware Execution
+
+Every model/tool invocation receives a timeout and budget.
+
+``` mermaid
+flowchart TD
+    A["Request"] --> B["Global 30s Deadline"]
+    B --> C["Router"]
+
+    C --> D["Parallel Independent Calls"]
+    D --> E["RAG"]
+    D --> F["Profile"]
+    D --> G["Constraints"]
+
+    E --> H["Planner"]
+    F --> H
+    G --> H
+
+    H --> I["Critic / Validator"]
+
+    I -->|Within Budget| J["Final Response"]
+    I -->|Budget Risk| K["Fast Fallback / Reduced Workflow"]
+    I -->|Quality Failure| L["Escalation if Budget Allows"]
+
+    K --> J
+    L --> J
+```
+
+The system should prefer **degrading gracefully** over exceeding the
+latency ceiling.
+
+Examples:
+
+-   skip an unnecessary secondary critic if the answer already passed
+    deterministic validation;
+-   use a faster model when the task does not justify stronger
+    reasoning;
+-   avoid repeated retrieval when cached evidence is sufficient;
+-   parallelize independent retrieval and profile extraction;
+-   stop retries when the remaining latency budget is too small.
+
+------------------------------------------------------------------------
+
+## 32.6 Performance Metrics
+
+The observability system will track:
+
+``` text
+End-to-end latency
+p50 latency
+p95 latency
+p99 latency
+Model inference latency
+RAG latency
+Database latency
+MCP latency
+Queue/wait latency
+Routing latency
+Number of model calls
+Number of tool calls
+Token usage
+Cache hit rate
+Retry count
+Escalation count
+```
+
+The primary performance target is:
+
+> **p95 end-to-end latency should remain comfortably below the 30-second
+> ceiling for normal supported requests.**
+
+The exact target will be finalized after baseline measurements.
+
+------------------------------------------------------------------------
+
+## 32.7 Local vs External Models
+
+The architecture supports both:
+
+### External APIs
+
+-   GPT
+-   Claude
+-   Gemini
+-   DeepSeek
+-   Qwen
+-   Kimi
+
+### Optional local/open-weight models
+
+A local model can be deployed in Docker when it is useful for:
+
+-   low-complexity classification;
+-   privacy-sensitive preprocessing;
+-   embeddings/reranking;
+-   fallback inference;
+-   experimentation.
+
+The project should **not** force every model to run locally. The
+objective is to optimize the complete system.
+
+------------------------------------------------------------------------
+
+## 32.8 Container-Level Resource Controls
+
+Docker Compose should define resource-aware configuration for services.
+
+Examples:
+
+``` text
+CPU limits
+Memory limits
+Health checks
+Restart policies
+Environment-based configuration
+Connection pool limits
+Service dependencies
+Startup ordering
+```
+
+For model-serving containers, GPU support can be enabled only if local
+hardware and model choice justify it.
+
+------------------------------------------------------------------------
+
+# 33. Updated Observability Architecture
+
+The observability layer must capture both **agent behavior and
+model-routing behavior**.
+
+``` mermaid
+flowchart TB
+    R["Request"] --> M["Master Agent"]
+
+    M --> RT["Router Decision"]
+    RT --> MD["Selected Model"]
+
+    MD --> AG["Agent Execution"]
+    AG --> TOOL["Tool / MCP Calls"]
+
+    AG --> ST["State Changes"]
+    AG --> LAT["Latency"]
+    AG --> TOK["Token Usage"]
+
+    RT --> ROUTE["Routing Metadata"]
+    ROUTE --> O["Observability"]
+
+    TOOL --> O
+    ST --> O
+    LAT --> O
+    TOK --> O
+
+    O --> TR["Distributed Trace"]
+    O --> MET["Metrics"]
+    O --> EV["Evaluation Store"]
+
+    TR --> DB["Analysis Dashboard"]
+    MET --> DB
+    EV --> DB
+```
+
+Each model invocation should record:
+
+``` text
+run_id
+agent_id
+task_id
+provider
+model_id
+routing_reason
+required_capabilities
+estimated_latency
+actual_latency
+input_tokens
+output_tokens
+cache_status
+retry_count
+quality_result
+```
+
+This makes the routing system itself experimentally observable.
+
+------------------------------------------------------------------------
+
+# 34. Updated Evaluation Strategy
+
+The original 44-run evaluation suite remains mandatory, but the final
+project will add **model-routing experiments** to it.
+
+For each persona/task, the system can be evaluated under:
+
+``` text
+Single Model
+Static Multi-Model
+Dynamic Router
+Dynamic Router + Cascade
+```
+
+This produces a matrix such as:
+
+``` mermaid
+flowchart LR
+    P["44 Persona Runs"]
+
+    P --> A["Single Model"]
+    P --> B["Static Multi-Model"]
+    P --> C["Dynamic Routing"]
+    P --> D["Dynamic Routing + Cascade"]
+
+    A --> E["Metrics"]
+    B --> E
+    C --> E
+    D --> E
+
+    E --> F["Quality / Latency / Cost / Reliability"]
+```
+
+This turns model routing into a measurable contribution rather than a
+collection of API integrations.
+
+------------------------------------------------------------------------
+
+# 35. Updated Definition of Done
+
+## Phase 1
+
+-   [ ] Problem statement approved
+-   [ ] PEAS completed
+-   [ ] Environment analysis completed
+-   [ ] Agent responsibilities defined
+-   [ ] Architecture diagrams completed
+-   [ ] RAG strategy defined
+-   [ ] Reasoning strategy defined
+-   [ ] Communication strategy defined
+-   [ ] Tech stack justified
+-   [ ] Timeline completed
+-   [ ] Team responsibility matrix completed
+-   [ ] Minimal ADK prototype demonstrated
+
+## Phase 2
+
+-   [ ] Six core agents operational
+-   [ ] Sequential workflow operational
+-   [ ] Hierarchical workflow operational
+-   [ ] Shared state operational
+-   [ ] RAG operational
+-   [ ] Tools operational
+-   [ ] Safety validation operational
+-   [ ] Critic/reflection operational
+-   [ ] Persistent memory operational
+-   [ ] MCP integration operational
+-   [ ] Structured traces operational
+-   [ ] Working frontend
+-   [ ] Model gateway abstraction operational
+-   [ ] At least three model providers integrated
+-   [ ] Initial latency benchmark available
+
+## Phase 3
+
+-   [ ] 40+ evaluation runs completed
+-   [ ] Persona-linked evaluation completed
+-   [ ] Architecture comparison completed
+-   [ ] Agent bottleneck analysis completed
+-   [ ] Multi-model comparison completed
+-   [ ] Dynamic model routing operational
+-   [ ] Model capability registry operational
+-   [ ] Model cascading operational
+-   [ ] Reflection experiment completed
+-   [ ] Advanced planning evaluated
+-   [ ] Event-driven memory operational
+-   [ ] Multimodal extension implemented where feasible
+-   [ ] Docker Compose production-like runtime operational
+-   [ ] Docker-based caching/concurrency/resource controls evaluated
+-   [ ] End-to-end latency benchmark completed
+-   [ ] p95 latency measured against 30-second ceiling
+-   [ ] Observability dashboard operational
+-   [ ] Deployment completed
+-   [ ] Final report completed
+-   [ ] Final presentation completed
+-   [ ] Viva preparation completed
 
 # 32. Observability Architecture
 
@@ -1680,38 +2421,39 @@ flowchart TB
 
 # 36. Phase Timeline
 
-  -----------------------------------------------------------------------
-  Period                              Milestone
-  ----------------------------------- -----------------------------------
-  **Now → Sep 21**                    Problem definition, charter,
-                                      architecture and Phase 1 submission
+  ---------------------------------------------------------------------
+  Period                             Milestone
+  ---------------------------------- ----------------------------------
+  **Now → Sep 21**                   Problem definition, charter,
+                                     architecture and Phase 1
+                                     submission
 
-  **Sep 22--27**                      ADK foundation, Runner, Sessions,
-                                      State
+  **Sep 22--27**                     ADK foundation, Runner, Sessions,
+                                     State
 
-  **Sep 28--Oct 4**                   Root + Profile + RAG
+  **Sep 28--Oct 4**                  Root + Profile + RAG
 
-  **Oct 5--11**                       Planner + tools + sequential
-                                      workflow
+  **Oct 5--11**                      Planner + tools + sequential
+                                     workflow
 
-  **Oct 12--18**                      Safety + Critic + reflection
+  **Oct 12--18**                     Safety + Critic + reflection
 
-  **Oct 19--25**                      Phase 2 prototype + documentation
+  **Oct 19--25**                     Phase 2 prototype + documentation
 
-  **Oct 26--Nov 2**                   Communication architecture
-                                      experiments
+  **Oct 26--Nov 2**                  Communication architecture
+                                     experiments
 
-  **Nov 3--9**                        40+ runs + evaluation
+  **Nov 3--9**                       40+ runs + evaluation
 
-  **Nov 10--16**                      ToT + event-driven memory +
-                                      multimodal
+  **Nov 10--16**                     ToT + event-driven memory +
+                                     multimodal
 
-  **Nov 17 onward**                   Observability + deployment + final
-                                      polish
+  **Nov 17 onward**                  Observability + deployment + final
+                                     polish
 
-  **Final week**                      Final report + PPT +
-                                      demonstration + viva
-  -----------------------------------------------------------------------
+  **Final week**                     Final report + PPT +
+                                     demonstration + viva
+  ---------------------------------------------------------------------
 
 Dates are a working plan and should be adjusted if faculty deadlines
 differ.
@@ -2113,57 +2855,57 @@ medical diagnosis or treatment claims.
 The final report should explicitly map project evidence to the course
 requirements.
 
-  -----------------------------------------------------------------------
-  Requirement                         Evidence
-  ----------------------------------- -----------------------------------
-  Problem Definition                  Problem statement + PEAS
+  ---------------------------------------------------------------------
+  Requirement                        Evidence
+  ---------------------------------- ----------------------------------
+  Problem Definition                 Problem statement + PEAS
 
-  Objectives / Outcomes               Project goals
+  Objectives / Outcomes              Project goals
 
-  Methodology                         Workflow + architecture
+  Methodology                        Workflow + architecture
 
-  Feasibility                         Technology/resource analysis
+  Feasibility                        Technology/resource analysis
 
-  Reasoning Strategy                  ReAct / structured planning /
-                                      reflection
+  Reasoning Strategy                 ReAct / structured planning /
+                                     reflection
 
-  RAG                                 Knowledge agent + retrieval
-                                      pipeline
+  RAG                                Knowledge agent + retrieval
+                                     pipeline
 
-  Tools                               Tool registry + traces
+  Tools                              Tool registry + traces
 
-  Messaging                           Sequential / broadcast / blackboard
-                                      / hierarchy
+  Messaging                          Sequential / broadcast /
+                                     blackboard / hierarchy
 
-  MCP                                 MCP server integration
+  MCP                                MCP server integration
 
-  Observability                       Run traces
+  Observability                      Run traces
 
-  Minimum Runs                        44+ evaluation cases
+  Minimum Runs                       44+ evaluation cases
 
-  Persona Linkage                     Synthetic persona IDs
+  Persona Linkage                    Synthetic persona IDs
 
-  Latency                             Per-agent and total latency
+  Latency                            Per-agent and total latency
 
-  Accuracy / Quality                  Evaluation metrics
+  Accuracy / Quality                 Evaluation metrics
 
-  Bottleneck Analysis                 Agent-level trace analysis
+  Bottleneck Analysis                Agent-level trace analysis
 
-  Architecture Comparison             Sequential vs broadcast vs
-                                      blackboard vs hierarchical
+  Architecture Comparison            Sequential vs broadcast vs
+                                     blackboard vs hierarchical
 
-  Technical Depth                     ADK + state + workflows + tools +
-                                      memory
+  Technical Depth                    ADK + state + workflows + tools +
+                                     memory
 
-  Innovation                          Transparent multi-agent Yoga
-                                      application
+  Innovation                         Transparent multi-agent Yoga
+                                     application
 
-  Application                         Functional personalized Yoga
-                                      assistant
+  Application                        Functional personalized Yoga
+                                     assistant
 
-  Individual Contribution             Responsibility + Git history +
-                                      documentation
-  -----------------------------------------------------------------------
+  Individual Contribution            Responsibility + Git history +
+                                     documentation
+  ---------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
