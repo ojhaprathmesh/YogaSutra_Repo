@@ -14,64 +14,60 @@ from __future__ import annotations
 
 import os
 
-from google.adk.agents import LlmAgent
+from google.adk.agents import LlmAgent, SequentialAgent
 
 from app.agents.knowledge.agent import knowledge_agent
 from app.agents.planner.agent import planner_agent
 from app.agents.profile.agent import profile_agent
 
-_MODEL = os.environ.get("YOGASUTRA_MODEL", "gemini-2.0-flash")
+_MODEL = os.environ.get("YOGASUTRA_MODEL", "gemini-3.1-flash-lite")
 
-ROOT_INSTRUCTION = """You are the Root Orchestration Agent for YogaSutra, an AI yoga assistant.
+RESPONSE_INSTRUCTION = """You are the Final Response Agent for YogaSutra, an expert AI yoga assistant.
 
-Your job is to coordinate a team of specialist agents to serve the user's yoga request.
+Your role is to produce the final, human-readable response for the user by reading the shared session state:
+- 'user_profile': User experience level, available duration, goal, time of day.
+- 'retrieved_evidence': Evidence chunks retrieved from the knowledge base.
+- 'candidate_plan': The practice plan designed by the PlannerAgent.
 
-WORKFLOW (follow this sequence for every yoga practice request):
+Produce an encouraging, beautifully structured response in clean Markdown (NOT raw JSON).
+Follow this format:
 
-1. CLASSIFY: Determine if this is a "practice" request (user wants a yoga session) or
-   a "knowledge" request (user has a question about yoga).
+# 🧘 YogaSutra Practice Plan
 
-2. For PRACTICE requests, delegate to sub-agents in this exact order:
-   a. First delegate to "ProfileAgent" — it will extract the user's profile.
-   b. Then delegate to "KnowledgeAgent" — it will retrieve relevant knowledge.
-   c. Then delegate to "PlannerAgent" — it will create the practice plan.
+[Warm, personalized greeting referencing user's goal, experience level, and morning/evening preference]
 
-3. After the PlannerAgent has run, read the "candidate_plan" from session state
-   and produce a final, beautifully formatted response for the user that includes:
-   - A warm greeting and brief summary of the user's profile
-   - The complete practice sequence with clear timing
-   - Evidence sources used
-   - An encouraging closing message
+**⏱ Duration:** [X] minutes | **Level:** [level] | **Focus:** [goal]
 
-Format the final response in clean, readable plain text (NOT JSON).
-Use this structure:
----
-🧘 YogaSutra Practice Plan
-[Brief personalised intro]
-
-⏱ Total Duration: X minutes | Level: [level] | Focus: [goal]
-
-📋 Your Practice Sequence:
-1. [Pose Name] ([Sanskrit]) — X min
-   [Instructions]
-   
-[Repeat for each pose...]
-
-📚 Evidence Sources: [list of sources used]
-
-✨ [Encouraging closing note]
 ---
 
-For KNOWLEDGE requests, answer the yoga question directly using your knowledge.
+### 📋 Your Practice Sequence
+1. **[Pose English Name]** (*[Sanskrit Name]*): [duration] min
+   - *Instructions:* [Clear cues and transitions]
+   - *Safety Note:* [Any contraindication / modification from evidence]
+
+[Repeat for each pose in candidate_plan...]
+
+---
+
+### 📚 Authentic Yoga Knowledge Citations
+- [List relevant sources and sections cited from retrieved_evidence]
+
+---
+✨ *[Warm, encouraging closing message for their practice]*
 """
 
-root_agent = LlmAgent(
-    name="RootAgent",
+response_agent = LlmAgent(
+    name="ResponseAgent",
     model=_MODEL,
+    description="Synthesizes the candidate plan and evidence into a warm, human-readable final response.",
+    instruction=RESPONSE_INSTRUCTION,
+)
+
+root_agent = SequentialAgent(
+    name="RootAgent",
     description=(
-        "Root orchestrator for YogaSutra. Classifies user requests and delegates "
-        "to ProfileAgent, KnowledgeAgent, and PlannerAgent in sequence."
+        "Root orchestrator for YogaSutra. Executes the sequential Phase 1 workflow: "
+        "ProfileAgent -> KnowledgeAgent -> PlannerAgent -> ResponseAgent."
     ),
-    instruction=ROOT_INSTRUCTION,
-    sub_agents=[profile_agent, knowledge_agent, planner_agent],
+    sub_agents=[profile_agent, knowledge_agent, planner_agent, response_agent],
 )

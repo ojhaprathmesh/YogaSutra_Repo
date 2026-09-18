@@ -14,7 +14,7 @@ import os
 
 from google.adk.agents import LlmAgent
 
-_MODEL = os.environ.get("YOGASUTRA_MODEL", "gemini-2.0-flash")
+_MODEL = os.environ.get("YOGASUTRA_MODEL", "gemini-3.1-flash-lite")
 
 PROFILE_INSTRUCTION = """You are the Profile Extraction Agent for YogaSutra, an AI yoga assistant.
 

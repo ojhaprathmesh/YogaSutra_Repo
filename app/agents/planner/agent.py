@@ -26,7 +26,7 @@ from google.adk.agents import LlmAgent
 
 from app.tools.duration import calculate_practice_duration
 
-_MODEL = os.environ.get("YOGASUTRA_MODEL", "gemini-2.0-flash")
+_MODEL = os.environ.get("YOGASUTRA_MODEL", "gemini-3.1-flash-lite")
 
 PLANNER_INSTRUCTION = """You are the Practice Planner Agent for YogaSutra, an expert AI yoga instructor.
 

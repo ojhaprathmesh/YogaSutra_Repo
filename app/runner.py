@@ -17,6 +17,7 @@ Usage (programmatic)::
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import time
@@ -83,7 +84,6 @@ def run_yogasutra(user_input: str, persona_id: str = "P00") -> YogaSutraResult:
 
     # Create runner and session
     runner = InMemoryRunner(agent=root_agent, app_name="yogasutra")
-    session_service = InMemorySessionService()
 
     # Initial session state (blackboard)
     initial_state = {
@@ -93,11 +93,13 @@ def run_yogasutra(user_input: str, persona_id: str = "P00") -> YogaSutraResult:
         "user_input": user_input,
     }
 
-    session = session_service.create_session(
-        app_name="yogasutra",
-        user_id=user_id,
-        state=initial_state,
-        session_id=session_id,
+    asyncio.run(
+        runner.session_service.create_session(
+            app_name="yogasutra",
+            user_id=user_id,
+            state=initial_state,
+            session_id=session_id,
+        )
     )
 
     # Build the user message
@@ -134,12 +136,13 @@ def run_yogasutra(user_input: str, persona_id: str = "P00") -> YogaSutraResult:
                     "total_tokens": getattr(event.usage_metadata, "total_token_count", 0) or 0,
                 }
 
-            # Capture the final response
-            if event.is_final_response():
-                if event.content and event.content.parts:
-                    for part in event.content.parts:
-                        if hasattr(part, "text") and part.text:
-                            final_response_text += part.text
+            # Capture the final response from the terminal agent
+            if event.is_final_response() and event.content and event.content.parts:
+                response_parts = [
+                    p.text for p in event.content.parts if hasattr(p, "text") and p.text
+                ]
+                if response_parts:
+                    final_response_text = "\n".join(response_parts)
 
     except Exception as exc:  # noqa: BLE001
         final_response_text = f"[Error during run: {exc}]"
@@ -147,10 +150,12 @@ def run_yogasutra(user_input: str, persona_id: str = "P00") -> YogaSutraResult:
     total_ms = (time.monotonic() - t_start) * 1000
 
     # Retrieve the final session state
-    final_session = session_service.get_session(
-        app_name="yogasutra",
-        user_id=user_id,
-        session_id=session_id,
+    final_session = asyncio.run(
+        runner.session_service.get_session(
+            app_name="yogasutra",
+            user_id=user_id,
+            session_id=session_id,
+        )
     )
     session_state = dict(final_session.state) if final_session else {}
 

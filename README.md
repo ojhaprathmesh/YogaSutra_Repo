@@ -209,6 +209,6 @@ Per PLAN.md §35 (Phase 1 scope boundary):
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `GOOGLE_API_KEY` | *(required)* | Gemini API key |
-| `YOGASUTRA_MODEL` | `gemini-2.0-flash` | Model for all agents |
+| `YOGASUTRA_MODEL` | `gemini-3.5-flash` | Model for all agents |
 | `YOGASUTRA_TRACE_DIR` | `data/traces` | Where to save trace JSON files |
 | `YOGASUTRA_LOG_LEVEL` | `INFO` | Log level |

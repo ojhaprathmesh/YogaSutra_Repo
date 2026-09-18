@@ -15,7 +15,7 @@ from google.adk.agents import LlmAgent
 
 from app.tools.retrieval import retrieve_yoga_knowledge
 
-_MODEL = os.environ.get("YOGASUTRA_MODEL", "gemini-2.0-flash")
+_MODEL = os.environ.get("YOGASUTRA_MODEL", "gemini-3.1-flash-lite")
 
 KNOWLEDGE_INSTRUCTION = """You are the Knowledge Retrieval Agent for YogaSutra, an AI yoga assistant.
 

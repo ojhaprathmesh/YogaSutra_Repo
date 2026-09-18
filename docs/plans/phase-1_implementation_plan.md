@@ -324,7 +324,7 @@ Expected output:
 > **ADK Version**: Implemented with `google-adk==2.9.1` (installed via `pip3`). `uv` is not required — `pip3` works directly with Python 3.12.
 
 > [!NOTE]
-> **Model**: Phase 1 uses `gemini-2.0-flash` for all agents (cost-efficient, free tier: 1500 req/day).
+> **Model**: Phase 1 uses `gemini-3.5-flash` for all agents.
 > Per PLAN.md §31 (*Multi-Model Intelligence & Dynamic Model Routing*), multi-provider model routing with a Model Capability Registry and routing score engine is a **Phase 3** feature. Phase 1 intentionally uses a single provider.
 
 > [!NOTE]
