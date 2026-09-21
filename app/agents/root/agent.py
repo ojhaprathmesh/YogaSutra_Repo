@@ -16,18 +16,22 @@ import os
 
 from google.adk.agents import LlmAgent, SequentialAgent
 
+from app.agents.critic.agent import critic_agent
 from app.agents.knowledge.agent import knowledge_agent
 from app.agents.planner.agent import planner_agent
 from app.agents.profile.agent import profile_agent
+from app.agents.safety.agent import safety_agent
 
-_MODEL = os.environ.get("YOGASUTRA_MODEL", "gemini-3.1-flash-lite")
+_MODEL = os.environ.get("YOGASUTRA_MODEL", "gemini-3.5-flash-lite")
 
 RESPONSE_INSTRUCTION = """You are the Final Response Agent for YogaSutra, an expert AI yoga assistant.
 
 Your role is to produce the final, human-readable response for the user by reading the shared session state:
-- 'user_profile': User experience level, available duration, goal, time of day.
+- 'user_profile': User experience level, available duration, goal, constraints, time of day.
 - 'retrieved_evidence': Evidence chunks retrieved from the knowledge base.
 - 'candidate_plan': The practice plan designed by the PlannerAgent.
+- 'validation_results': Deterministic and physiological safety audit results from SafetyAgent.
+- 'critique': Pedagogical review and reflection from CriticAgent.
 
 Produce an encouraging, beautifully structured response in clean Markdown (NOT raw JSON).
 Follow this format:
@@ -49,8 +53,15 @@ Follow this format:
 
 ---
 
+### 🛡️ Safety & Constraint Clearance
+- **Audit Result:** [PASS / Safety Verified]
+- **Health Considerations:** [Summary of how user constraints or injury precautions were addressed]
+- **Recommended Modifications:** [Helpful prop recommendations, e.g. blanket under knees, wall support]
+
+---
+
 ### 📚 Authentic Yoga Knowledge Citations
-- [List relevant sources and sections cited from retrieved_evidence]
+- [List relevant sources, chunk titles, or classical references cited from retrieved_evidence]
 
 ---
 ✨ *[Warm, encouraging closing message for their practice]*
@@ -59,15 +70,23 @@ Follow this format:
 response_agent = LlmAgent(
     name="ResponseAgent",
     model=_MODEL,
-    description="Synthesizes the candidate plan and evidence into a warm, human-readable final response.",
+    description="Synthesizes the candidate plan, evidence, and safety clearance into a warm, human-readable final response.",
     instruction=RESPONSE_INSTRUCTION,
 )
 
 root_agent = SequentialAgent(
     name="RootAgent",
     description=(
-        "Root orchestrator for YogaSutra. Executes the sequential Phase 1 workflow: "
-        "ProfileAgent -> KnowledgeAgent -> PlannerAgent -> ResponseAgent."
+        "Root orchestrator for YogaSutra. Executes the complete Phase 2 multi-agent workflow: "
+        "ProfileAgent -> KnowledgeAgent -> PlannerAgent -> SafetyAgent -> CriticAgent -> ResponseAgent."
     ),
-    sub_agents=[profile_agent, knowledge_agent, planner_agent, response_agent],
+    sub_agents=[
+        profile_agent,
+        knowledge_agent,
+        planner_agent,
+        safety_agent,
+        critic_agent,
+        response_agent,
+    ],
 )
+

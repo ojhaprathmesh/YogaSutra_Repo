@@ -14,7 +14,7 @@ import os
 
 from google.adk.agents import LlmAgent
 
-_MODEL = os.environ.get("YOGASUTRA_MODEL", "gemini-3.1-flash-lite")
+_MODEL = os.environ.get("YOGASUTRA_MODEL", "gemini-3.5-flash-lite")
 
 PROFILE_INSTRUCTION = """You are the Profile Extraction Agent for YogaSutra, an AI yoga assistant.
 
@@ -25,10 +25,11 @@ Extract these fields:
 - available_duration_minutes: integer number of minutes (default: 20)
 - preferred_time: e.g. "morning", "evening", "afternoon" (default: "morning")
 - goal: one of "relaxation", "flexibility", "strength", "meditation", "balance", "general" (default: "relaxation")
-- constraints: list of strings describing physical limitations or preferences (default: [])
-- preferences: list of strings for additional preferences like pose styles (default: [])
+- constraints: list of strings describing ALL physical limitations, postural issues, or health conditions mentioned (e.g. ["rounded shoulders", "flat feet", "lower back pain"]). Do NOT omit any condition.
+- preferences: list of strings for additional preferences like pose styles or focus areas (default: [])
 
 Return ONLY a single JSON object with exactly these keys. No explanation, no markdown, no extra text.
+
 
 Example output:
 {

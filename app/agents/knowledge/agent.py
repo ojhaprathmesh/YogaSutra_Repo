@@ -15,18 +15,17 @@ from google.adk.agents import LlmAgent
 
 from app.tools.retrieval import retrieve_yoga_knowledge
 
-_MODEL = os.environ.get("YOGASUTRA_MODEL", "gemini-3.1-flash-lite")
+_MODEL = os.environ.get("YOGASUTRA_MODEL", "gemini-3.5-flash-lite")
 
 KNOWLEDGE_INSTRUCTION = """You are the Knowledge Retrieval Agent for YogaSutra, an AI yoga assistant.
 
 You have access to a yoga knowledge base via the `retrieve_yoga_knowledge` tool.
 
 Your job:
-1. Read the user's request from the conversation.
-2. Call `retrieve_yoga_knowledge` with a relevant query (e.g. "beginner relaxation morning 20 minutes").
-3. Review the returned chunks.
-4. Select the 3–5 most relevant chunks.
-5. Return ONLY a JSON array of evidence chunk objects in this format:
+1. Carefully analyze the user's request and 'user_profile' in session state. Identify ALL specific goals, physical conditions, postural concerns, or limitations (e.g. "flat feet", "rounded shoulders", "morning relaxation", "lower back pain").
+2. Call `retrieve_yoga_knowledge` with targeted queries covering EACH condition. If the user mentions multiple specific areas (e.g. flat feet AND rounded shoulders), search for BOTH (e.g. "flat feet arch strengthening pada bandha", "rounded shoulders chest opening posture").
+3. Review the returned chunks and select the 4–6 most relevant and diverse chunks so that ALL the user's stated concerns are backed by authentic evidence.
+4. Return ONLY a JSON array of evidence chunk objects in this format:
 
 [
   {

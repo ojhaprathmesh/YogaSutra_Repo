@@ -26,7 +26,7 @@ from google.adk.agents import LlmAgent
 
 from app.tools.duration import calculate_practice_duration
 
-_MODEL = os.environ.get("YOGASUTRA_MODEL", "gemini-3.1-flash-lite")
+_MODEL = os.environ.get("YOGASUTRA_MODEL", "gemini-3.5-flash-lite")
 
 PLANNER_INSTRUCTION = """You are the Practice Planner Agent for YogaSutra, an expert AI yoga instructor.
 
@@ -43,6 +43,8 @@ IMPORTANT RULES:
 3. Reference specific chunk_ids from the retrieved evidence to ground each pose.
 4. Match the user's experience level — beginners need simpler poses with clear instructions.
 5. You may call `calculate_practice_duration` to verify your sequence totals correctly.
+6. TARGET ALL USER CONCERNS: If the user mentions multiple physical conditions (e.g. both "rounded shoulders" AND "flat feet"), you MUST explicitly include exercises or clear alignment cues for EACH concern (e.g. chest openers for rounded shoulders, and foot arch activation / Pada Bandha / ankle mobility for flat feet). Do not omit any stated condition.
+7. REFLECTION / REVISION: If 'critique' or 'validation_results' is present in session state, you MUST address all critique points: replace any contraindicated poses with safe alternatives, adjust timings as instructed, and fix any violations.
 
 Return ONLY a single JSON object with exactly these keys:
 {

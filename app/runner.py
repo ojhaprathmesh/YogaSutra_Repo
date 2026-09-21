@@ -19,11 +19,22 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
+import logging
+import re
 import time
 import uuid
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
+
+# Suppress framework noise and experimental ADK warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+logging.getLogger("google").setLevel(logging.ERROR)
+logging.getLogger("google_genai").setLevel(logging.ERROR)
+logging.getLogger("google_genai.models").setLevel(logging.ERROR)
+logging.getLogger("google.adk").setLevel(logging.ERROR)
 
 from dotenv import load_dotenv
 from google.adk.runners import InMemoryRunner
@@ -59,13 +70,22 @@ class YogaSutraResult:
 # ---------------------------------------------------------------------------
 
 
-def run_yogasutra(user_input: str, persona_id: str = "P00") -> YogaSutraResult:
+def run_yogasutra(
+    user_input: str,
+    persona_id: str = "P00",
+    on_agent_start: Any | None = None,
+    on_agent_done: Any | None = None,
+    on_agent_error: Any | None = None,
+) -> YogaSutraResult:
     """
     Run the full YogaSutra multi-agent pipeline for a given user input.
 
     Args:
-        user_input:  The user's natural-language yoga request.
-        persona_id:  Optional persona identifier for tracing (default "P00").
+        user_input:      The user's natural-language yoga request.
+        persona_id:      Optional persona identifier for tracing (default "P00").
+        on_agent_start:  Optional callback(agent_name: str) fired when an agent begins.
+        on_agent_done:   Optional callback(agent_name: str) fired when an agent completes.
+        on_agent_error:  Optional callback(agent_name: str, msg: str) fired on error.
 
     Returns:
         YogaSutraResult with final_response, session_state, and trace.
@@ -112,6 +132,34 @@ def run_yogasutra(user_input: str, persona_id: str = "P00") -> YogaSutraResult:
     final_response_text = ""
     events_collected: list = []
 
+    # Live graph tracking: fire callbacks on author transitions
+    _current_author: list[str] = [""]  # mutable container for closure
+
+    def _on_new_author(author: str) -> None:
+        """Called when a new agent begins emitting events."""
+        prev = _current_author[0]
+        if prev and prev != author:
+            # Previous agent has finished — mark it done
+            if on_agent_done:
+                try:
+                    on_agent_done(prev)
+                except Exception:  # noqa: BLE001
+                    pass
+        if author and author != prev:
+            _current_author[0] = author
+            if on_agent_start:
+                try:
+                    on_agent_start(author)
+                except Exception:  # noqa: BLE001
+                    pass
+
+    # Activate RootAgent immediately
+    if on_agent_start:
+        try:
+            on_agent_start("RootAgent")
+        except Exception:  # noqa: BLE001
+            pass
+
     t_start = time.monotonic()
     try:
         for event in runner.run(
@@ -121,12 +169,14 @@ def run_yogasutra(user_input: str, persona_id: str = "P00") -> YogaSutraResult:
         ):
             events_collected.append(event)
 
-            # Track agent calls
-            if event.author and event.author not in trace.agents_called:
-                trace.record_agent(
-                    agent_name=event.author,
-                    latency_ms=0.0,  # Fine-grained latency tracked separately if needed
-                )
+            # Track agent calls and fire live graph callbacks
+            if event.author:
+                _on_new_author(event.author)
+                if event.author not in trace.agents_called:
+                    trace.record_agent(
+                        agent_name=event.author,
+                        latency_ms=0.0,
+                    )
 
             # Capture token usage if available
             if event.usage_metadata and event.author:
@@ -146,6 +196,27 @@ def run_yogasutra(user_input: str, persona_id: str = "P00") -> YogaSutraResult:
 
     except Exception as exc:  # noqa: BLE001
         final_response_text = f"[Error during run: {exc}]"
+        if on_agent_error and _current_author[0]:
+            try:
+                on_agent_error(_current_author[0], str(exc))
+            except Exception:  # noqa: BLE001
+                pass
+
+    # Mark the last active sub-agent as done
+    if on_agent_done and _current_author[0]:
+        try:
+            on_agent_done(_current_author[0])
+        except Exception:  # noqa: BLE001
+            pass
+
+    # RootAgent was activated at the start but never auto-completed via
+    # event.author transitions (sub-agents are the actual authors in events).
+    # Explicitly mark it done now that the full pipeline has finished.
+    if on_agent_done:
+        try:
+            on_agent_done("RootAgent")
+        except Exception:  # noqa: BLE001
+            pass
 
     total_ms = (time.monotonic() - t_start) * 1000
 
@@ -178,9 +249,45 @@ def run_yogasutra(user_input: str, persona_id: str = "P00") -> YogaSutraResult:
                     )
 
     # Record state changes
-    for key in ["user_profile", "retrieved_evidence", "candidate_plan"]:
+    for key in ["user_profile", "retrieved_evidence", "candidate_plan", "validation_results", "critique"]:
         if session_state.get(key):
             trace.record_state_change(key, f"Populated by pipeline")
+
+    # Clean and record validation results in trace
+    def _clean_json_dict(val: Any) -> dict:
+        if isinstance(val, dict):
+            return val
+        if not isinstance(val, str):
+            return {}
+        s = val.strip()
+        s = re.sub(r"^```[a-zA-Z]*\s*", "", s)
+        s = re.sub(r"\s*```$", "", s).strip()
+        try:
+            parsed = json.loads(s)
+            if isinstance(parsed, dict):
+                return parsed
+        except Exception:
+            pass
+        match = re.search(r"\{.*\}", s, re.DOTALL)
+        if match:
+            try:
+                parsed = json.loads(match.group(0))
+                if isinstance(parsed, dict):
+                    return parsed
+            except Exception:
+                pass
+        return {"summary": val}
+
+    val_res = session_state.get("validation_results")
+    if val_res:
+        trace.validation_results = _clean_json_dict(val_res)
+
+    critique_res = session_state.get("critique")
+    if critique_res:
+        trace.critic_result = _clean_json_dict(critique_res)
+
+    trace.revision_count = int(session_state.get("revision_count", 0))
+
 
     # Finalise trace
     trace.set_final_output(final_response_text)

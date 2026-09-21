@@ -10,7 +10,6 @@ Tests:
 - get_user_profile returns None for unknown sessions
 - store_user_profile + get_user_profile round-trips correctly
 """
-import pytest
 
 from app.tools.retrieval import retrieve_yoga_knowledge
 from app.tools.duration import calculate_practice_duration

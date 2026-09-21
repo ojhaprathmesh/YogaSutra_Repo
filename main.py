@@ -21,7 +21,15 @@ warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 logging.getLogger("google").setLevel(logging.ERROR)
 logging.getLogger("google.genai").setLevel(logging.ERROR)
+logging.getLogger("google_genai").setLevel(logging.ERROR)
+logging.getLogger("google_genai.models").setLevel(logging.ERROR)
 logging.getLogger("google.adk").setLevel(logging.ERROR)
+try:
+    from google.genai.models import AsyncModels, Models
+    AsyncModels._logged_afc_warning = True
+    Models._logged_afc_warning = True
+except Exception:
+    pass
 
 from rich.console import Console
 from rich.markdown import Markdown
@@ -61,6 +69,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Skip printing the execution trace summary",
     )
+    parser.add_argument(
+        "--no-graph",
+        action="store_true",
+        help="Use simple spinner instead of live pipeline graph",
+    )
     return parser.parse_args()
 
 
@@ -93,6 +106,27 @@ def print_trace_summary(result) -> None:
             docs_table.add_row(doc.get("chunk_id", ""), doc.get("title", ""), doc.get("topic", ""))
         console.print(docs_table)
 
+    # Safety Validation Summary
+    if result.trace.validation_results:
+        val = result.trace.validation_results
+        val_status = val.get("status", "UNKNOWN")
+        status_color = "green" if val_status == "PASS" else "red"
+        console.print()
+        console.print(f"[bold]🛡️ Safety Audit:[/bold] [{status_color}]{val_status}[/{status_color}] — {val.get('summary', '')}")
+        violations = val.get("violations", [])
+        for v in violations:
+            console.print(f"   ⚠️ [{v.get('severity', 'WARN')}] {v.get('pose', '')}: {v.get('recommendation', '')}")
+
+    # Critic & Reflection Summary
+    if result.trace.critic_result:
+        crit = result.trace.critic_result
+        crit_decision = crit.get("decision", "UNKNOWN")
+        decision_color = "green" if crit_decision == "PASS" else "yellow"
+        console.print()
+        console.print(f"[bold]🔍 Critic Reflection:[/bold] [{decision_color}]{crit_decision}[/{decision_color}] (Score: {crit.get('score', '?')}/10)")
+        if crit.get("critique"):
+            console.print(f"   [dim]{crit.get('critique')}[/dim]")
+
     # State changes
     if result.trace.state_changes:
         console.print()
@@ -104,6 +138,7 @@ def print_trace_summary(result) -> None:
     console.print()
     console.print(f"[dim]Run ID:[/dim] [bold]{result.run_id}[/bold]")
     console.print(f"[dim]Session ID:[/dim] {result.session_id}")
+    console.print(f"[dim]Revisions:[/dim] {result.trace.revision_count}")
     console.print(f"[dim]Total latency:[/dim] {result.trace.total_latency_ms:.0f} ms")
     if result.trace_path:
         console.print(f"[dim]Trace saved to:[/dim] {result.trace_path}")
@@ -115,17 +150,34 @@ def main() -> int:
     console.print()
     console.print(Panel.fit(
         "[bold magenta]🧘 YogaSutra[/bold magenta] — Multi-Agent AI Yoga Planner\n"
-        "[dim]Phase 1 Proof of Concept | Google ADK[/dim]",
+        "[dim]Phase 2 Working Multi-Agent Prototype | Google ADK[/dim]",
         border_style="magenta",
     ))
     console.print()
     console.print(f"[bold]User input:[/bold] {args.input}")
     console.print()
 
-    with console.status("[bold green]Running YogaSutra agents...[/bold green]", spinner="dots"):
-        # Import here so dotenv is loaded before google-adk initialises
-        from app.runner import run_yogasutra  # noqa: PLC0415
-        result = run_yogasutra(user_input=args.input, persona_id=args.persona)
+    # Import here so dotenv is loaded before google-adk initialises
+    from app.runner import run_yogasutra  # noqa: PLC0415
+
+    if args.no_graph:
+        # ── Fallback: simple spinner ────────────────────────────────────────
+        with console.status("[bold green]Running YogaSutra agents...[/bold green]", spinner="dots"):
+            result = run_yogasutra(user_input=args.input, persona_id=args.persona)
+    else:
+        # ── Live pipeline architecture graph ────────────────────────────────
+        from app.ui.live_graph import PipelineGraph  # noqa: PLC0415
+
+        graph = PipelineGraph(console=console, user_input=args.input)
+
+        with graph.live():
+            result = run_yogasutra(
+                user_input=args.input,
+                persona_id=args.persona,
+                on_agent_start=graph.activate,
+                on_agent_done=graph.complete,
+                on_agent_error=graph.error,
+            )
 
     # Print final response
     console.print(Rule("🧘 Practice Plan", style="magenta"))

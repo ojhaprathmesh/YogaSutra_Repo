@@ -36,6 +36,7 @@ htmlcov/
 # Data (keep structure, ignore generated files)
 data/traces/*.json
 data/personas/*.json
+data/temp
 
 # Logs
 *.log

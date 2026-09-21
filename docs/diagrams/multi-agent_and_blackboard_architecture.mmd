@@ -1,0 +1,60 @@
+flowchart TB
+    U["User Request (CLI Input)"] --> ROOT["Root Agent Orchestrator"]
+    
+    subgraph BB["Shared Session State (ADK Blackboard)"]
+        S_PROF["user_profile"]
+        S_EVID["retrieved_evidence"]
+        S_PLAN["candidate_plan"]
+        S_VAL["validation_results"]
+        S_CRIT["critique"]
+        S_RESP["final_response"]
+    end
+
+    subgraph AGENTS["Specialized LLM Agents"]
+        direction TB
+        A1["1. ProfileAgent"]
+        A2["2. KnowledgeAgent"]
+        A3["3. PlannerAgent"]
+        A4["4. SafetyAgent"]
+        A5["5. CriticAgent"]
+        A6["6. ResponseAgent"]
+    end
+
+    subgraph TOOLS["Deterministic Tools & Corpus"]
+        T_RAG["retrieve_yoga_knowledge()"]
+        T_DUR["calculate_practice_duration()"]
+        T_SAFE["validate_safety_and_constraints()"]
+        CORPUS[("289-Chunk Yoga Corpus")]
+    end
+
+    ROOT --> A1
+    A1 -->|writes profile| S_PROF
+    
+    A1 --> A2
+    A2 <-->|query & return chunks| T_RAG
+    T_RAG <--> CORPUS
+    A2 -->|writes evidence| S_EVID
+
+    A2 --> A3
+    S_PROF -.->|reads| A3
+    S_EVID -.->|reads| A3
+    A3 <-->|verify duration| T_DUR
+    A3 -->|writes plan| S_PLAN
+
+    A3 --> A4
+    S_PROF -.->|reads| A4
+    S_PLAN -.->|reads| A4
+    A4 <-->|audit contraindications| T_SAFE
+    A4 -->|writes audit| S_VAL
+
+    A4 --> A5
+    S_PROF -.->|reads| A5
+    S_PLAN -.->|reads| A5
+    S_VAL -.->|reads| A5
+    A5 -->|writes score & decision| S_CRIT
+
+    A5 --> A6
+    BB -.->|reads full state| A6
+    A6 -->|writes final plan| S_RESP
+
+    S_RESP --> OUT["Terminal Output + Trace JSON"]
