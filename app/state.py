@@ -135,6 +135,7 @@ class YogaSessionState(BaseModel):
     run_id: str = Field(default_factory=lambda: f"run_{uuid.uuid4().hex[:8]}")
     session_id: str = ""
     persona_id: str = "P00"
+    phase: int = 2
 
     # Request
     user_input: str = ""

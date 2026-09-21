@@ -109,6 +109,14 @@ VERT = _conn(
 # border alignment across all terminal emulators (macOS Terminal, iTerm, etc.)
 # ---------------------------------------------------------------------------
 
+PIPELINE_NODES_PHASE1: list[str] = [
+    "RootAgent",
+    "ProfileAgent",
+    "KnowledgeAgent",
+    "PlannerAgent",
+    "ResponseAgent",
+]
+
 PIPELINE_NODES: list[str] = [
     "RootAgent",
     "ProfileAgent",
@@ -190,10 +198,13 @@ class PipelineGraph:
         self,
         console: Console | None = None,
         user_input: str = "",
+        phase: int = 2,
     ) -> None:
         self._console    = console or Console()
         self._user_input = user_input
-        self._state: dict[str, str] = {n: "idle" for n in PIPELINE_NODES}
+        self._phase      = phase
+        self._nodes      = PIPELINE_NODES_PHASE1 if phase == 1 else PIPELINE_NODES
+        self._state: dict[str, str] = {n: "idle" for n in self._nodes}
         self._messages: dict[str, str] = {}
         self._spinner_idx: int = 0
         self._live: Live | None = None
@@ -439,15 +450,15 @@ class PipelineGraph:
         elapsed   = self._elapsed()
         done_n    = sum(1 for s in self._state.values() if s == "done")
         active_ns = [n for n, s in self._state.items() if s == "active"]
-        total     = len(PIPELINE_NODES)
+        total     = len(self._nodes)
 
         rows: list = []
 
         # ── Header ──────────────────────────────────────────────────────
         hdr = Text()
         hdr.append("  🧘 YogaSutra", style=Style(color="bright_magenta", bold=True))
-        hdr.append(" — Multi-Agent Pipeline Architecture",
-                   style=Style(color="grey70"))
+        subtitle = " — Phase 1 Minimal Proof of Concept" if self._phase == 1 else " — Multi-Agent Pipeline Architecture"
+        hdr.append(subtitle, style=Style(color="grey70"))
         hdr.append(f"   ⏱ {elapsed}", style=Style(color="grey50", italic=True))
         rows += [Text(), hdr, Rule(style="dim magenta"), Text()]
 
@@ -479,8 +490,10 @@ class PipelineGraph:
         rows.append(Align.center(MERGE))
         rows.append(Text())
 
-        # ── Sequential: Planner → Safety → Critic → Response ────────────
-        for name in ["PlannerAgent", "SafetyAgent", "CriticAgent", "ResponseAgent"]:
+        # ── Sequential agents ────────────────────────────────────────────
+        # Phase 1: Planner -> Response; Phase 2: Planner -> Safety -> Critic -> Response
+        seq_agents = ["PlannerAgent", "ResponseAgent"] if self._phase == 1 else ["PlannerAgent", "SafetyAgent", "CriticAgent", "ResponseAgent"]
+        for name in seq_agents:
             rows.append(Align.center(self._node(name)))
             if name != "ResponseAgent":
                 rows += [Text(), Align.center(VERT), Text()]
@@ -499,28 +512,26 @@ class PipelineGraph:
         )
         rows += [Text(), Align.center(VERT), Text(), Align.center(out_panel)]
 
-        # ── Subgraph section (BB / AGENTS / TOOLS — mirrors .mmd) ───────
-        rows += [Text(), Rule(style="dim cyan"), Text()]
+        # ── Subgraph section (BB / AGENTS / TOOLS — Phase 2 only) ───────
+        if self._phase != 1:
+            rows += [Text(), Rule(style="dim cyan"), Text()]
 
-        sg_label = Text(
-            "  Subgraph Architecture  ·  mirrors docs/diagrams/multi-agent_and_blackboard_architecture.mmd",
-            style=Style(color="grey50", italic=True),
-        )
-        rows += [Align.center(sg_label), Text()]
+            sg_label = Text(
+                "  Subgraph Architecture  ·  mirrors docs/diagrams/multi-agent_and_blackboard_architecture.mmd",
+                style=Style(color="grey50", italic=True),
+            )
+            rows += [Align.center(sg_label), Text()]
 
-        # Table.grid has fixed-width columns that never wrap to a new row
-        # (unlike Columns which wraps when terminal < total width).
-        # 3 × (TRIPLE_W + 2 padding) = 3 × 30 = 90 chars → safe for any 100-char terminal.
-        sg_tbl = Table.grid(padding=(0, TRIPLE_PAD))
-        sg_tbl.add_column(width=TRIPLE_W)
-        sg_tbl.add_column(width=TRIPLE_W)
-        sg_tbl.add_column(width=TRIPLE_W)
-        sg_tbl.add_row(
-            self._subgraph_bb(),
-            self._subgraph_agents(),
-            self._subgraph_tools(),
-        )
-        rows.append(Align.center(sg_tbl))
+            sg_tbl = Table.grid(padding=(0, TRIPLE_PAD))
+            sg_tbl.add_column(width=TRIPLE_W)
+            sg_tbl.add_column(width=TRIPLE_W)
+            sg_tbl.add_column(width=TRIPLE_W)
+            sg_tbl.add_row(
+                self._subgraph_bb(),
+                self._subgraph_agents(),
+                self._subgraph_tools(),
+            )
+            rows.append(Align.center(sg_tbl))
 
         # ── Status bar ───────────────────────────────────────────────────
         rows += [Text(), Rule(style="dim magenta")]

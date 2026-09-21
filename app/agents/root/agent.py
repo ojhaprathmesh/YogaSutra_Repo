@@ -74,10 +74,26 @@ response_agent = LlmAgent(
     instruction=RESPONSE_INSTRUCTION,
 )
 
-root_agent = SequentialAgent(
+# Phase 1 Minimal Proof-of-Concept workflow: Profile -> Knowledge -> Planner -> Response
+phase1_root_agent = SequentialAgent(
     name="RootAgent",
     description=(
-        "Root orchestrator for YogaSutra. Executes the complete Phase 2 multi-agent workflow: "
+        "Root orchestrator for YogaSutra Phase 1. Executes the minimal sequential workflow: "
+        "ProfileAgent -> KnowledgeAgent -> PlannerAgent -> ResponseAgent."
+    ),
+    sub_agents=[
+        profile_agent.clone(),
+        knowledge_agent.clone(),
+        planner_agent.clone(),
+        response_agent.clone(),
+    ],
+)
+
+# Phase 2 Working Multi-Agent Prototype workflow: Profile -> Knowledge -> Planner -> Safety -> Critic -> Response
+phase2_root_agent = SequentialAgent(
+    name="RootAgent",
+    description=(
+        "Root orchestrator for YogaSutra Phase 2. Executes the complete multi-agent workflow: "
         "ProfileAgent -> KnowledgeAgent -> PlannerAgent -> SafetyAgent -> CriticAgent -> ResponseAgent."
     ),
     sub_agents=[
@@ -89,4 +105,7 @@ root_agent = SequentialAgent(
         response_agent,
     ],
 )
+
+# Default root agent alias (Phase 2)
+root_agent = phase2_root_agent
 

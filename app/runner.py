@@ -41,7 +41,7 @@ from google.adk.runners import InMemoryRunner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types as genai_types
 
-from app.agents.root.agent import root_agent
+from app.agents.root.agent import phase1_root_agent, phase2_root_agent, root_agent
 from app.tracing.trace import ExecutionTrace
 
 # Load .env if present
@@ -63,6 +63,7 @@ class YogaSutraResult:
     session_state: dict
     trace: ExecutionTrace
     trace_path: Path | None = None
+    phase: int = 2
 
 
 # ---------------------------------------------------------------------------
@@ -73,16 +74,18 @@ class YogaSutraResult:
 def run_yogasutra(
     user_input: str,
     persona_id: str = "P00",
+    phase: int = 2,
     on_agent_start: Any | None = None,
     on_agent_done: Any | None = None,
     on_agent_error: Any | None = None,
 ) -> YogaSutraResult:
     """
-    Run the full YogaSutra multi-agent pipeline for a given user input.
+    Run the YogaSutra multi-agent pipeline for a given user input.
 
     Args:
         user_input:      The user's natural-language yoga request.
         persona_id:      Optional persona identifier for tracing (default "P00").
+        phase:           Workflow phase: 1 (Phase 1 Minimal PoC) or 2 (Phase 2 Full MAS).
         on_agent_start:  Optional callback(agent_name: str) fired when an agent begins.
         on_agent_done:   Optional callback(agent_name: str) fired when an agent completes.
         on_agent_error:  Optional callback(agent_name: str, msg: str) fired on error.
@@ -100,10 +103,14 @@ def run_yogasutra(
         session_id=session_id,
         persona_id=persona_id,
         user_input=user_input,
+        phase=phase,
     )
 
+    # Select agent based on phase
+    chosen_agent = phase1_root_agent if phase == 1 else phase2_root_agent
+
     # Create runner and session
-    runner = InMemoryRunner(agent=root_agent, app_name="yogasutra")
+    runner = InMemoryRunner(agent=chosen_agent, app_name="yogasutra")
 
     # Initial session state (blackboard)
     initial_state = {
@@ -111,6 +118,7 @@ def run_yogasutra(
         "session_id": session_id,
         "persona_id": persona_id,
         "user_input": user_input,
+        "phase": phase,
     }
 
     asyncio.run(

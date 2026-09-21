@@ -52,6 +52,7 @@ class ExecutionTrace:
     session_id: str
     persona_id: str = "P00"
     user_input: str = ""
+    phase: int = 2
 
     # Accumulated during the run
     agents_called: list[str] = field(default_factory=list)
@@ -125,6 +126,7 @@ class ExecutionTrace:
             "run_id": self.run_id,
             "persona_id": self.persona_id,
             "session_id": self.session_id,
+            "phase": self.phase,
             "input": self.user_input,
             "agents_called": self.agents_called,
             "tools_called": self.tools_called,

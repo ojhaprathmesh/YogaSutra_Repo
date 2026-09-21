@@ -65,6 +65,13 @@ def parse_args() -> argparse.Namespace:
         help="Persona ID for tracing (default: P00)",
     )
     parser.add_argument(
+        "--phase",
+        type=int,
+        choices=[1, 2],
+        default=2,
+        help="Workflow phase to execute: 1 (Phase 1 Minimal PoC) or 2 (Phase 2 Full MAS with Safety & Reflection)",
+    )
+    parser.add_argument(
         "--no-trace",
         action="store_true",
         help="Skip printing the execution trace summary",
@@ -83,25 +90,17 @@ def print_trace_summary(result) -> None:
     console.print(Rule("📊 Execution Trace", style="dim cyan"))
 
     # Agents
-    agents_table = Table(title="Agents Called", show_header=True, header_style="bold cyan")
-    agents_table.add_column("Agent", style="cyan")
-    agents_table.add_column("Latency (ms)", justify="right")
-    agents_table.add_column("Tokens (in/out)", justify="right")
+    agents_str = " → ".join(result.trace.agents_called)
+    console.print(f"[bold]Agents called:[/bold] {agents_str}")
 
-    for agent in result.trace.agents_called:
-        latency = result.trace.agent_latency_ms.get(agent, 0.0)
-        token_data = result.trace.token_usage.get(agent, {})
-        token_str = f"{token_data.get('input_tokens', '?')}/{token_data.get('output_tokens', '?')}"
-        agents_table.add_row(agent, f"{latency:.1f}", token_str)
-
-    console.print(agents_table)
-
-    # Retrieved documents
+    # Retrieved docs
     if result.trace.retrieved_documents:
-        docs_table = Table(title="Retrieved Evidence", show_header=True, header_style="bold green")
-        docs_table.add_column("Chunk ID", style="green")
-        docs_table.add_column("Title")
-        docs_table.add_column("Topic")
+        console.print()
+        console.print(f"[bold]Retrieved Knowledge Chunks ({len(result.trace.retrieved_documents)}):[/bold]")
+        docs_table = Table(box=None, padding=(0, 2))
+        docs_table.add_column("Chunk ID", style="cyan")
+        docs_table.add_column("Title", style="white")
+        docs_table.add_column("Topic", style="magenta")
         for doc in result.trace.retrieved_documents:
             docs_table.add_row(doc.get("chunk_id", ""), doc.get("title", ""), doc.get("topic", ""))
         console.print(docs_table)
@@ -130,15 +129,17 @@ def print_trace_summary(result) -> None:
     # State changes
     if result.trace.state_changes:
         console.print()
-        console.print("[bold]State fields populated:[/bold]")
+        console.print("[bold]State Transitions (Blackboard):[/bold]")
         for change in result.trace.state_changes:
-            console.print(f"  ✓ [cyan]{change['field']}[/cyan] — {change['summary']}")
+            console.print(f"   • [dim]{change.get('key')}[/dim] written by [cyan]{change.get('agent')}[/cyan]")
 
-    # Summary
+    # Timing & run metadata
     console.print()
     console.print(f"[dim]Run ID:[/dim] [bold]{result.run_id}[/bold]")
     console.print(f"[dim]Session ID:[/dim] {result.session_id}")
-    console.print(f"[dim]Revisions:[/dim] {result.trace.revision_count}")
+    console.print(f"[dim]Phase:[/dim] Phase {result.phase}")
+    if result.phase == 2:
+        console.print(f"[dim]Revisions:[/dim] {result.trace.revision_count}")
     console.print(f"[dim]Total latency:[/dim] {result.trace.total_latency_ms:.0f} ms")
     if result.trace_path:
         console.print(f"[dim]Trace saved to:[/dim] {result.trace_path}")
@@ -147,10 +148,11 @@ def print_trace_summary(result) -> None:
 def main() -> int:
     args = parse_args()
 
+    phase_label = "Phase 1 Minimal Proof of Concept" if args.phase == 1 else "Phase 2 Working Multi-Agent Prototype"
     console.print()
     console.print(Panel.fit(
-        "[bold magenta]🧘 YogaSutra[/bold magenta] — Multi-Agent AI Yoga Planner\n"
-        "[dim]Phase 2 Working Multi-Agent Prototype | Google ADK[/dim]",
+        f"[bold magenta]🧘 YogaSutra[/bold magenta] — Multi-Agent AI Yoga Planner\n"
+        f"[dim]{phase_label} | Google ADK[/dim]",
         border_style="magenta",
     ))
     console.print()
@@ -163,17 +165,22 @@ def main() -> int:
     if args.no_graph:
         # ── Fallback: simple spinner ────────────────────────────────────────
         with console.status("[bold green]Running YogaSutra agents...[/bold green]", spinner="dots"):
-            result = run_yogasutra(user_input=args.input, persona_id=args.persona)
+            result = run_yogasutra(
+                user_input=args.input,
+                persona_id=args.persona,
+                phase=args.phase,
+            )
     else:
         # ── Live pipeline architecture graph ────────────────────────────────
         from app.ui.live_graph import PipelineGraph  # noqa: PLC0415
 
-        graph = PipelineGraph(console=console, user_input=args.input)
+        graph = PipelineGraph(console=console, user_input=args.input, phase=args.phase)
 
         with graph.live():
             result = run_yogasutra(
                 user_input=args.input,
                 persona_id=args.persona,
+                phase=args.phase,
                 on_agent_start=graph.activate,
                 on_agent_done=graph.complete,
                 on_agent_error=graph.error,

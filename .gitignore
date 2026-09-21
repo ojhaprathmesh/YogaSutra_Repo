@@ -45,3 +45,6 @@ logs/
 # Type checking
 .mypy_cache/
 .ruff_cache/
+
+# Temp plans
+**_PLAN.md
