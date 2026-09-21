@@ -131,7 +131,9 @@ def print_trace_summary(result) -> None:
         console.print()
         console.print("[bold]State Transitions (Blackboard):[/bold]")
         for change in result.trace.state_changes:
-            console.print(f"   • [dim]{change.get('key')}[/dim] written by [cyan]{change.get('agent')}[/cyan]")
+            field = change.get("key") or change.get("field", "unknown")
+            agent = change.get("agent") or "Pipeline"
+            console.print(f"   • [cyan]{field}[/cyan] updated by [bold]{agent}[/bold]")
 
     # Timing & run metadata
     console.print()

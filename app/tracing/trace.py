@@ -105,9 +105,14 @@ class ExecutionTrace:
             {"chunk_id": chunk_id, "title": title, "topic": topic}
         )
 
-    def record_state_change(self, field_name: str, summary: str) -> None:
+    def record_state_change(self, field_name: str, summary: str = "", agent: str = "") -> None:
         """Record a state field being populated by an agent."""
-        self.state_changes.append({"field": field_name, "summary": summary})
+        self.state_changes.append({
+            "field": field_name,
+            "key": field_name,
+            "agent": agent,
+            "summary": summary,
+        })
 
     def set_final_output(self, output: str) -> None:
         """Set the final response text."""

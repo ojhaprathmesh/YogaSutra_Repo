@@ -257,9 +257,20 @@ def run_yogasutra(
                     )
 
     # Record state changes
-    for key in ["user_profile", "retrieved_evidence", "candidate_plan", "validation_results", "critique"]:
+    state_agent_map = {
+        "user_profile": "ProfileAgent",
+        "retrieved_evidence": "KnowledgeAgent",
+        "candidate_plan": "PlannerAgent",
+        "validation_results": "SafetyAgent",
+        "critique": "CriticAgent",
+    }
+    for key, writer_agent in state_agent_map.items():
         if session_state.get(key):
-            trace.record_state_change(key, f"Populated by pipeline")
+            trace.record_state_change(
+                field_name=key,
+                summary="Populated by pipeline",
+                agent=writer_agent,
+            )
 
     # Clean and record validation results in trace
     def _clean_json_dict(val: Any) -> dict:
@@ -296,7 +307,6 @@ def run_yogasutra(
 
     trace.revision_count = int(session_state.get("revision_count", 0))
 
-
     # Finalise trace
     trace.set_final_output(final_response_text)
     trace.total_latency_ms = round(total_ms, 2)
@@ -316,4 +326,5 @@ def run_yogasutra(
         session_state=session_state,
         trace=trace,
         trace_path=trace_path,
+        phase=phase,
     )

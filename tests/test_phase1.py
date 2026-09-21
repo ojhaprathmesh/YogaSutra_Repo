@@ -67,6 +67,16 @@ class TestPhase1StateAndTracing:
         d = trace.to_dict()
         assert d["phase"] == 1
 
+    def test_execution_trace_record_state_change(self):
+        trace = ExecutionTrace(run_id="run_test", session_id="sess_test", phase=1)
+        trace.record_state_change("candidate_plan", "Populated by pipeline", "PlannerAgent")
+        assert len(trace.state_changes) == 1
+        change = trace.state_changes[0]
+        assert change["field"] == "candidate_plan"
+        assert change["key"] == "candidate_plan"
+        assert change["agent"] == "PlannerAgent"
+        assert change["summary"] == "Populated by pipeline"
+
 
 class TestPhase1LiveGraph:
     """Verify Phase 1 live terminal visualizer layout."""

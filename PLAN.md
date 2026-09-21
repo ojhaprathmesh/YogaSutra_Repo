@@ -748,35 +748,42 @@ Profile
   → Morning
   → Relaxation goal
 
-Knowledge Retrieval
+Knowledge Retrieval & Chunk-Level Claims
   → 5 documents retrieved
   → 4 evidence chunks selected
+  → Verified Chunk Claims:
+      • "Hold Balasana for 3 minutes"
+        → File: restorative_yoga.md | Chunk: chunk_res_012 (L34-45)
+      • "Stack front knee directly above heel at 90°"
+        → File: virabhadrasana_2.md | Chunk: chunk_v2_004 (L42-58)
+      • "Inhale to lengthen spine before folding"
+        → File: paschimottanasana.md | Chunk: chunk_pas_007 (L18-29)
 
 Planning
-  → Candidate plan generated
+  → Candidate plan generated with claim-to-chunk bindings
 
 Validation
   → Duration: PASS
   → Constraint check: PASS
-  → Evidence coverage: PASS
+  → Evidence coverage & Claim Verification: PASS
 
 Reflection
-  → Initial plan reviewed
+  → Initial plan reviewed against chunk claims
   → 1 revision requested
 
 Final
-  → Revised plan returned
+  → Revised plan returned with auditable chunk citations
 
 Metrics
   → Total latency
   → Agent latencies
   → Tool calls
   → Token usage
-  → Retrieved sources
+  → Retrieved sources & Chunk claims
 ```
 
 The trace is an explanation of **what the system did and why a decision
-was accepted/rejected**, not an exposure of hidden model reasoning.
+was accepted/rejected**, with verifiable claims traceable down to the specific file chunk.
 
 ------------------------------------------------------------------------
 
@@ -789,56 +796,75 @@ The knowledge pipeline will be:
 ``` mermaid
 flowchart LR
     D["Curated Yoga Documents"] --> L["Document Loader"]
-    L --> C["Chunking"]
-    C --> M["Metadata"]
+    L --> C["Chunking & Line Mapping"]
+    C --> M["Provenance Metadata\n(File, Chunk ID, Lines, Hash)"]
     M --> E["Embeddings"]
     E --> V[("PostgreSQL + pgvector")]
 
     Q["User Query"] --> R["Retriever"]
     V --> R
     R --> RR["Ranking / Re-ranking"]
-    RR --> X["Evidence Context"]
+    RR --> X["Evidence Context + Chunk Claims"]
     X --> KA["Knowledge Agent"]
-    KA --> ANS["Grounded Response + Sources"]
+    KA --> ANS["Grounded Response +\nAuditable Chunk Claims"]
 ```
 
 ## Knowledge Corpus
 
-The corpus may contain appropriately sourced and licensed material
+The corpus contains appropriately sourced and licensed material
 covering:
 
 -   yoga terminology;
--   asanas;
+-   asanas and biomechanical alignment standards;
 -   pranayama;
 -   meditation;
 -   philosophy;
 -   practice descriptions;
--   structured metadata;
--   project-specific safety/constraint information.
+-   structured metadata and file chunk hashes;
+-   project-specific safety and contraindication information.
 
-Every knowledge-grounded answer should retain source metadata.
+Every knowledge-grounded answer must retain chunk-level source metadata and explicit claim attribution.
 
 ------------------------------------------------------------------------
 
-# 17. RAG Metadata Model
+# 17. Chunk-Level Knowledge Provenance & Claim Attribution Model
 
-Each knowledge chunk should retain metadata similar to:
+To satisfy rigorous academic grounding and safety standards, YogaSutra avoids generic document-level references. Every factual statement, asana instruction, contraindication rule, or real-time posture cue is bound to an **atomic claim linked directly to a specific chunk of a specific file**.
+
+### Provenance Schema
+
+Each knowledge chunk in the vector store and execution trace contains:
 
 ``` json
 {
-  "document_id": "doc_001",
-  "title": "Example Source",
-  "section": "Example Section",
-  "topic": "pranayama",
-  "chunk_id": "doc_001_023",
-  "source_type": "reference",
-  "license": "..."
+  "document_id": "doc_asana_014",
+  "source_file": "data/knowledge/asanas/virabhadrasana_ii.md",
+  "chunk_id": "chunk_v2_004",
+  "section_heading": "Biomechanical Alignment & Knee Safety",
+  "line_range": "L42-L58",
+  "content_hash": "sha256:7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069",
+  "extracted_claims": [
+    "The front knee must remain stacked vertically over the heel without collapsing inward (valgus)",
+    "The front thigh should approach parallel to the floor at an angle of 90 degrees",
+    "Hyperextension of the back knee must be avoided by engaging the quadriceps"
+  ],
+  "verbatim_quote": "Bend your front knee until the thigh is parallel with the mat, ensuring the knee is directly over the ankle...",
+  "source_type": "curated_reference",
+  "license": "CC-BY-SA-4.0"
 }
 ```
 
-The final system should be able to answer:
+### Claim Attribution Workflow
 
-> Which evidence was used to generate this answer?
+1. **Retrieval**: The Knowledge Agent retrieves chunks matching the user's goals or asana requirements.
+2. **Claim Extraction**: The Knowledge Agent extracts atomic claims from retrieved chunks and includes both the claim text and the chunk reference in its response.
+3. **Plan Binding**: The Planner Agent explicitly annotates each step in the practice plan with its supporting `chunk_id`, `source_file`, and `line_range`.
+4. **Validation & Critique**: The Safety and Critic Agents verify that each generated instruction is strictly entailed by the referenced chunk, rejecting or revising any unsourced assertions.
+
+The system is able to answer at any time:
+
+> **"Where did this instruction originate?"**
+> $\rightarrow$ *Originates from `data/knowledge/asanas/virabhadrasana_ii.md`, Chunk `chunk_v2_004` (Lines 42–58).*
 
 ------------------------------------------------------------------------
 
@@ -850,13 +876,14 @@ access.
 ### Core Planning & Knowledge Tools:
 
 ``` text
-retrieve_yoga_knowledge()
+retrieve_yoga_knowledge(query, top_k) -> list[ChunkWithClaims]
+verify_chunk_claims(plan_step_text, chunk_ids) -> claim_attribution_report
+get_chunk_provenance(chunk_id) -> source_file, line_range, content_hash, quote
 get_user_profile()
 get_session_history()
 calculate_practice_duration()
 validate_constraints()
 record_feedback()
-get_source_metadata()
 ```
 
 ### Speech & Audio Tools (Active Scope):
@@ -1195,26 +1222,59 @@ answer quality.
 
 # 27. Per-Run Trace Schema
 
-Every run should produce a machine-readable trace.
+Every run produces a machine-readable execution trace capturing full provenance down to the exact file chunk.
 
 ``` json
 {
   "run_id": "run_027",
   "persona_id": "P01",
   "session_id": "session_027",
-  "input": "...",
-  "agents_called": [],
-  "tools_called": [],
-  "retrieved_documents": [],
+  "input": "I am a beginner and have 20 minutes in the morning. I want a relaxing practice.",
+  "input_modality": "voice",
+  "agents_called": ["root", "profile", "knowledge", "planner", "safety", "critic", "speech"],
+  "tools_called": ["retrieve_yoga_knowledge", "verify_chunk_claims", "validate_constraints", "synthesize_speech_feedback"],
+  "retrieved_evidence_chunks": [
+    {
+      "chunk_id": "chunk_v2_004",
+      "source_file": "data/knowledge/asanas/virabhadrasana_ii.md",
+      "section": "Biomechanical Alignment & Knee Safety",
+      "line_range": "L42-L58",
+      "content_hash": "sha256:7f83b165..."
+    }
+  ],
+  "chunk_provenance_claims": [
+    {
+      "claim_statement": "Front knee must be stacked vertically over the heel at 90 degrees",
+      "source_file": "data/knowledge/asanas/virabhadrasana_ii.md",
+      "chunk_id": "chunk_v2_004",
+      "line_range": "L42-L58",
+      "verification_status": "VERIFIED"
+    }
+  ],
   "state_changes": [],
   "agent_latency_ms": {},
   "total_latency_ms": 0,
   "token_usage": {},
-  "validation_results": {},
-  "critic_result": {},
+  "validation_results": {
+    "deterministic_status": "PASS",
+    "contraindications_checked": ["knee_strain", "hypertension"]
+  },
+  "critic_result": {
+    "decision": "PASS",
+    "score": 9,
+    "critique": "Plan respects duration and beginner constraints."
+  },
   "revision_count": 0,
   "final_output": "...",
-  "evaluation": {}
+  "audio_cue_urls": ["/static/audio/run_027_guidance.mp3"],
+  "hitl_evaluation": {
+    "expert_id": "evaluator_expert_01",
+    "safety_score": 5,
+    "chunk_fidelity_score": 5,
+    "sequencing_score": 4,
+    "audio_clarity_score": 5,
+    "notes": "Verified against virabhadrasana_ii.md chunk. Excellent anatomical safety."
+  }
 }
 ```
 
@@ -1223,82 +1283,103 @@ This allows the project to answer:
 -   Which run produced this result?
 -   Which agents participated?
 -   Which tools were called?
--   What evidence was retrieved?
--   Which agent caused the delay?
--   Which agent produced an incorrect intermediate result?
--   How many revisions occurred?
--   How did the architecture affect final quality?
+-   **Which exact file chunk and line range originated each claim?**
+-   Which agent caused latency bottlenecks?
+-   How did human expert judges rate physical safety and instructional usability?
 
 ------------------------------------------------------------------------
 
 # 28. Evaluation Metrics
 
-## Quality
+## Human-in-the-Loop Domain Expert Assessment (Primary)
 
--   Task success
--   Goal alignment
--   Plan coherence
--   Personalization
--   Constraint satisfaction
+-   **Biomechanical Safety Score (1–5)**: Anatomical risk, contraindication avoidance, joint strain protection.
+-   **Chunk-Level Claim Fidelity (1–5)**: Verification that plan assertions match referenced file chunk text.
+-   **Sequencing & Physiological Pacing (1–5)**: Warm-up $\rightarrow$ peak $\rightarrow$ counter-pose $\rightarrow$ cool-down coherence.
+-   **Auditory Guidance & Usability (1–5)**: Hands-free instructional usability on a physical yoga mat.
+-   **Inter-Rater Reliability (IRR)**: Cohen's Kappa ($\kappa$) / Fleiss' Kappa across independent evaluators.
 
-## Grounding
+## Grounding & Provenance
 
--   Retrieval relevance
--   Source coverage
--   Citation correctness
--   Hallucination rate
+-   **Chunk Retrieval Precision & Recall**: Relevance of retrieved chunks against curated gold standards.
+-   **Claim-to-Chunk Attribution Rate**: Percentage of generated instructions with verified chunk citations.
+-   **Hallucination Rate**: Percentage of unsourced or contradictory claims detected.
 
-## Agent Performance
+## Agent Performance & Efficiency
 
--   Per-agent latency
--   Per-agent token usage
--   Tool-call accuracy
--   Error rate
--   Revision frequency
+-   Per-agent latency (including STT, RAG, Planner, Safety, Critic, TTS).
+-   Per-agent token usage and tool invocation accuracy.
+-   Revision frequency and convergence rate.
 
-## Multi-Agent Performance
+## System & Multimodal Operations
 
--   Total latency
--   Message count
--   Redundancy
--   Coordination overhead
--   Final quality
-
-## Safety
-
--   Rule compliance
--   Unsafe-output detection
--   Clarification rate
--   Escalation rate
-
-## System
-
--   End-to-end latency
--   Cost/token consumption
--   Failure rate
--   Availability during evaluation
+-   End-to-end latency (voice-in to voice-out and text-in to text-out).
+-   Real-time posture correction event latency ($< 2.0\text{s}$).
+-   Failure rate and pipeline availability.
 
 ------------------------------------------------------------------------
 
-# 29. LLM-as-Judge
+# 29. Human-in-the-Loop (HITL) Evaluation & Domain Expert Judge
 
-Where suitable, an LLM judge may evaluate generated outputs on
-dimensions such as:
+Yoga is an applied physical discipline directly involving the human body, joints, muscles, and autonomic nervous system. Recommending improper asanas, reckless breath retentions, or ungrounded physical alignments can cause acute musculoskeletal injury (e.g., knee ligament strain, cervical disc compression) or adverse cardiovascular events.
 
-``` text
-Goal Alignment
-Grounding
-Coherence
-Personalization
-Constraint Satisfaction
-Instruction Following
+### Rejection of Pure Agent-as-Judge
+
+Relying exclusively on an autonomous LLM or Agent-as-Judge presents a severe flaw: **hallucinated plausibility**. LLMs can generate eloquent, persuasive reasoning that appears authoritative while containing dangerous physical advice or subtle biomechanical errors. An LLM evaluator frequently rates such outputs highly because of stylistic fluency.
+
+Therefore, YogaSutra **rejects pure Agent-as-Judge as the final arbiter** and establishes a **Human-in-the-Loop (HITL) Evaluation System**.
+
+### Two-Tier Evaluation Architecture
+
+``` mermaid
+flowchart TD
+    RUN["YogaSutra Multi-Agent Run Output\n(Plan + Chunk Claims + Audio Cues)"] --> T1["Tier 1: Automated Advisory Pre-Screen\n(Deterministic Rules + Critic Reflection)"]
+    
+    T1 -->|Pre-Screen Flag: Violation| REV["Agent Self-Revision Loop"]
+    REV --> RUN
+    
+    T1 -->|Pre-Screen: Cleared| TRACE["Per-Run Structured Execution Trace\n(Logged to Evaluation Store)"]
+    
+    TRACE --> T2["Tier 2: Human-in-the-Loop (HITL) Expert Panel\n(Certified Yoga Instructors & Domain Evaluators)"]
+    
+    subgraph HITL_Rubric["Human Evaluation Rubric (1–5 Likert)"]
+        R1["1. Biomechanical Safety\n(Anatomical risk & contraindications)"]
+        R2["2. Chunk Claim Fidelity\n(Audit claim against source file chunk)"]
+        R3["3. Physiological Sequencing\n(Warm-up, peak pose, cool-down flow)"]
+        R4["4. Hands-Free Usability\n(Auditory pacing & voice cue clarity)"]
+    end
+    
+    T2 --> R1
+    T2 --> R2
+    T2 --> R3
+    T2 --> R4
+    
+    R1 --> FINAL["Final Benchmark Scorecard & Inter-Rater Reliability (Kappa)"]
+    R2 --> FINAL
+    R3 --> FINAL
+    R4 --> FINAL
 ```
 
-The judge itself must be treated as an evaluation component rather than
-an unquestionable ground truth.
+### Standardized Human Expert Rubric
 
-For important metrics, human review or deterministic checks should
-complement LLM-based evaluation.
+Human judges evaluate runs across 4 dimensions:
+
+| Dimension | Score Range | Description | Critical Failure Rule |
+| :--- | :--- | :--- | :--- |
+| **1. Biomechanical Safety** | 1 (Dangerous) – 5 (Flawless) | Evaluates joint alignment, spinal compression risk, and strict adherence to stated user medical contraindications. | **Score $\le 2$ results in immediate run failure regardless of other scores.** |
+| **2. Chunk-to-Claim Fidelity** | 1 (Hallucinated) – 5 (Fully Grounded) | Evaluator audits generated instructions against the exact referenced file chunk (`source_file` and `line_range`). | Any fabricated medical or anatomical claim receives a score of 1. |
+| **3. Sequencing & Pacing** | 1 (Disjointed) – 5 (Optimal Flow) | Evaluates energetic progression: gentle mobilization $\rightarrow$ standing/strengthening $\rightarrow$ counter-poses $\rightarrow$ restorative rest. | Omission of warm-up or counter-pose caps score at 3. |
+| **4. Auditory Usability** | 1 (Confusing) – 5 (Intuitive) | Evaluates whether spoken audio cues are concise, non-distracting, and actionable while eyes are off the screen. | Verbose or delayed cues receive $\le 2$. |
+
+### Human-in-the-Loop Inspection Interface
+
+The evaluation tool provides domain evaluators with:
+1. **Interactive Plan Viewer**: Inspecting sequence, timing, and posture cues.
+2. **Chunk Claim Auditor**: Clickable link to the exact source markdown file and line range for instantaneous verification of every claim.
+3. **Audio Playback**: Listening to synthesized voice cues to evaluate pacing.
+4. **Scoring & Annotation Form**: Recording 1–5 scores, qualitative clinical notes, and approval/rejection flags.
+
+Inter-rater agreement is calculated using **Cohen's Kappa ($\kappa$)** (for pairs) and **Fleiss' Kappa** (for multi-evaluator panels), establishing an objective, scientifically defensible evaluation standard.
 
 ------------------------------------------------------------------------
 
@@ -2089,13 +2170,13 @@ collection of API integrations.
 -   [ ] Sequential workflow operational
 -   [ ] Hierarchical workflow operational
 -   [ ] Shared state operational (including audio & pose event blackboard channels)
--   [ ] RAG operational (grounding asana sequences & biomechanical alignment standards)
--   [ ] Tools operational (including speech transcription & synthesis)
+-   [ ] RAG operational with atomic claim-to-chunk provenance (`source_file`, `chunk_id`, `line_range`)
+-   [ ] Tools operational (including speech transcription, synthesis, and chunk claim verification)
 -   [ ] Safety validation operational
--   [ ] Critic/reflection operational
+-   [ ] Critic/reflection operational (verifying plan claims against referenced chunk evidence)
 -   [ ] Persistent memory operational
 -   [ ] MCP integration operational
--   [ ] Structured traces operational
+-   [ ] Structured traces operational with chunk provenance claims
 -   [ ] Working frontend with speech interaction
 -   [ ] Model gateway abstraction operational
 -   [ ] At least three model providers integrated
@@ -2104,6 +2185,8 @@ collection of API integrations.
 ## Phase 3
 
 -   [ ] 40+ evaluation runs completed (including speech and live pose test scenarios)
+-   [ ] Human-in-the-Loop (HITL) domain expert panel evaluation completed across all 40+ runs
+-   [ ] Inter-rater reliability (Cohen's / Fleiss' Kappa) measured on human expert rubric scores
 -   [ ] Persona-linked evaluation completed
 -   [ ] Architecture comparison completed
 -   [ ] Agent bottleneck analysis completed (including speech and CV latency)
@@ -2819,21 +2902,22 @@ yoga-sutra/
   Tool Use                    Retrieval, validation, profile and analytics tools
   RAG                         Yoga Knowledge Agent
   Agentic RAG                 Retrieval + reasoning + tool loop
+  Chunk-Level Grounding       Atomic claim-to-chunk file attribution model
   Multi-Agent Workflow        Specialized agents
   Hierarchical Architecture   Root Manager
   Sequential Architecture     Ordered workflow
   Broadcast                   Parallel specialists
   Blackboard                  Shared ADK state
-  Event Driven                Feedback/session events
+  Event Driven                Feedback/session and real-time posture events
   Memory                      Session + persistent memory
   KRR                         Rules + structured knowledge + LLM
   Guardrails                  Input/tool/output validation
-  Safety                      Constraint validator
+  Safety                      Constraint validator & biomechanical safety
   MCP                         Standardized tool access
   A2A                         Optional Phase 3 extension
   Observability               Traces and metrics
-  LLM-as-Judge                Automated quality evaluation
-  Human-in-the-loop           Clarification/escalation
+  Human-in-the-Loop Judge     Domain expert (certified instructor) benchmark evaluation
+  Automated Pre-Screen        Deterministic constraint verification & self-critique
   Multimodal AI               Voice/image/pose extension
   Deployment                  Cloud-hosted application
 
@@ -2851,47 +2935,45 @@ concepts from CrewAI lectures.
 
 CrewAI concepts remain useful for understanding:
 
--   role specialization;
 -   task decomposition;
 -   sequential workflows;
 -   hierarchical management;
 -   parallel/broadcast communication;
 -   blackboard communication;
--   memory;
--   observability.
+-   reflection and memory.
 
 They do not require CrewAI as a runtime dependency.
 
 ------------------------------------------------------------------------
 
-## DD-02 --- Six Core Agents
+## DD-02 --- Small Specialist Agents over Mega-Agents
 
-**Decision:** Use a small number of specialized agents.
+**Decision:** Maintain a small team of single-purpose agents.
 
-**Reason:** Agent proliferation increases communication overhead,
-latency, debugging complexity and redundant reasoning. Every agent must
-have a distinct responsibility.
-
-------------------------------------------------------------------------
-
-## DD-03 --- PostgreSQL + pgvector
-
-**Decision:** Use PostgreSQL with pgvector for the initial knowledge
-system.
-
-**Reason:** It provides relational application data and vector retrieval
-without introducing an unnecessary second database platform.
+**Reason:** Decomposing the system into dozens of micro-agents creates
+excessive latency and token overhead. Combining everything into a single
+agent eliminates the architectural comparison value of the project.
 
 ------------------------------------------------------------------------
 
-## DD-04 --- Structured Trace Instead of Raw CoT
+## DD-03 --- Dedicated Vector DB for Knowledge
 
-**Decision:** Expose execution/decision traces rather than hidden model
-chain-of-thought.
+**Decision:** Use PostgreSQL + pgvector for the curated knowledge base.
 
-**Reason:** Users need actionable transparency: what agents ran, what
-evidence was retrieved, which constraints were checked, what changed,
-and why a result was accepted or revised.
+**Reason:** The project requires evidence grounding, source tracking,
+and metadata filtering. A proper vector store enables true Agentic RAG
+and keeps evidence distinct from session memory.
+
+------------------------------------------------------------------------
+
+## DD-04 --- Shared Blackboard for Session Context
+
+**Decision:** Use ADK session state as a blackboard for multi-agent
+coordination.
+
+**Reason:** Passing complete conversational history between agents
+wastes tokens and creates confusion. A structured blackboard provides a
+clean contract between agents.
 
 ------------------------------------------------------------------------
 
@@ -2934,6 +3016,14 @@ medical diagnosis or treatment claims.
 
 ------------------------------------------------------------------------
 
+## DD-09 --- Human-in-the-Loop Evaluation for Physical Health
+
+**Decision:** Employ certified yoga instructors and domain human evaluators as the primary benchmark judges rather than relying on an autonomous LLM/Agent-as-Judge.
+
+**Reason:** Yoga instructions directly affect human bodily posture, joint mechanics, spinal alignment, and cardiovascular safety. LLM evaluators suffer from "hallucinated plausibility," frequently grading dangerous sequencing or improper joint alignments as acceptable if presented with fluent prose. A rigorous Human-in-the-Loop (HITL) panel with a standardized 4-dimensional rubric and inter-rater reliability metrics is scientifically and ethically mandatory when evaluating physical human movement applications.
+
+------------------------------------------------------------------------
+
 # 42. Risk Register
 
   -----------------------------------------------------------------------
@@ -2947,10 +3037,11 @@ medical diagnosis or treatment claims.
                                                   tasks; measure
                                                   per-agent latency
 
-  Hallucination           High                    RAG + source tracking +
-                                                  critic
+  Hallucination           High                    RAG + chunk-level claim
+                                                  attribution + critic
 
   Poor retrieval          High                    Metadata, ranking,
+                                                  chunk line mapping,
                                                   evaluation dataset
 
   Unsafe recommendation   High                    Deterministic
@@ -2973,9 +3064,11 @@ medical diagnosis or treatment claims.
                                                   STT/TTS; CV runs as an
                                                   isolated async event worker
 
-  Evaluation subjectivity Medium                  Deterministic metrics +
-                                                  LLM judge + human
-                                                  review
+  Evaluation subjectivity Medium                  Standardized 4-dimension
+  & LLM judge bias                                human expert rubric +
+                                                  inter-rater reliability
+                                                  (Cohen's Kappa) +
+                                                  chunk-level claim audits
 
   Framework/API changes   Medium                  Pin dependencies and
                                                   document ADK version
@@ -3018,19 +3111,21 @@ medical diagnosis or treatment claims.
 -   [ ] Sequential workflow operational
 -   [ ] Hierarchical workflow operational
 -   [ ] Shared state operational (including audio & pose blackboard channels)
--   [ ] RAG operational (grounding practice plans & asana alignment standards)
--   [ ] Tools operational (including speech transcription & synthesis)
+-   [ ] RAG operational with atomic claim-to-chunk provenance (`source_file`, `chunk_id`, `line_range`)
+-   [ ] Tools operational (including speech transcription, synthesis, and chunk claim verification)
 -   [ ] Safety validation operational
--   [ ] Critic/reflection operational
+-   [ ] Critic/reflection operational (verifying plan claims against referenced chunk evidence)
 -   [ ] Persistent memory operational
 -   [ ] MCP integration operational
--   [ ] Structured traces operational
+-   [ ] Structured traces operational with chunk provenance claims
 -   [ ] Working frontend with speech interaction
 -   [ ] Initial evaluation suite
 
 ## Phase 3
 
 -   [ ] 40+ evaluation runs completed (including speech and live pose test scenarios)
+-   [ ] Human-in-the-Loop (HITL) domain expert panel evaluation completed across all 40+ runs
+-   [ ] Inter-rater reliability (Cohen's / Fleiss' Kappa) measured on human expert rubric scores
 -   [ ] Persona-linked evaluation completed
 -   [ ] Architecture comparison completed
 -   [ ] Agent bottleneck analysis completed (including speech and CV turnaround)
