@@ -65,28 +65,27 @@ This makes the project suitable for studying the transition from:
 **LLM → Tool-using Agent → Multi-Agent System → Observable Agentic
 Workflow**
 
-------------------------------------------------------------------------
-
-## 3. Project Goals
+---------------------------------------------------------------------## 3. Project Goals
 
 ### Primary Goal
 
-Design and implement a **transparent, personalized, grounded, and
-measurable multi-agent Yoga assistant using Google ADK**.
+Design and implement a **transparent, personalized, grounded, hands-free speech-enabled, and measurable multi-agent Yoga assistant using Google ADK**, with an extensible **real-time computer vision posture correction module**.
 
 ### Secondary Goals
 
 -   Demonstrate hierarchical multi-agent orchestration.
 -   Demonstrate sequential and workflow-based execution.
--   Demonstrate event-driven behavior.
+-   Demonstrate event-driven behavior (including posture deviation and voice events).
 -   Demonstrate multiple agent communication patterns.
--   Integrate Agentic RAG.
+-   Integrate Agentic RAG for both practice plans and asana biomechanical alignment standards.
 -   Demonstrate ReAct-style tool-oriented reasoning.
 -   Demonstrate structured planning and reflection.
 -   Introduce ToT-style candidate exploration as an advanced feature.
--   Maintain session and persistent user context.
+-   Maintain session and persistent user context (including posture history).
 -   Integrate MCP meaningfully.
--   Implement safety and constraint guardrails.
+-   Implement safety and constraint guardrails (physiological & biomechanical).
+-   Implement bidirectional speech communication (hands-free STT & TTS).
+-   Provide a plug-and-play real-time computer vision module (OpenCV + MediaPipe / YOLO-Pose) for posture feedback.
 -   Record per-run traces and agent-level metrics.
 -   Evaluate the system using at least 40 structured runs.
 -   Compare architecture/model configurations quantitatively.
@@ -119,6 +118,25 @@ philosophy, or related curated knowledge.
 The system retrieves relevant sources and generates an evidence-grounded
 response.
 
+### Speech Communication Mode (Hands-Free Yoga Interface)
+
+Yoga practice is inherently physical and hands-free. The system supports:
+
+-   bidirectional voice conversation (Speech-to-Text via Whisper / Web Speech API);
+-   expressive, pace-adjusted spoken responses (Text-to-Speech via Google Cloud TTS / ElevenLabs / local synthesis);
+-   hands-free session control ("Next pose", "Pause", "Explain alignment");
+-   real-time audio cues spoken during active practice execution.
+
+### Modular Real-Time Video Posture Correction (CV Extension)
+
+A decoupled, plug-and-play computer vision pipeline that can be activated during practice:
+
+-   real-time video ingestion via OpenCV;
+-   skeletal keypoint extraction via MediaPipe Pose (33 3D landmarks) or YOLOv8-pose (17 keypoints);
+-   deterministic geometric joint angle computation (knee flexion, hip-shoulder symmetry, spinal alignment);
+-   event-driven posture deviation detection against curated asana biomechanics;
+-   real-time corrective cues dispatched via visual overlay HUD and synthesized speech.
+
 ### Personalization
 
 The system uses:
@@ -127,14 +145,14 @@ The system uses:
 -   previous interactions;
 -   user preferences;
 -   feedback;
--   historical practice context.
+-   historical practice context and posture progress metrics.
 
 ### Agentic Workflow
 
 The system can:
 
 -   determine which agents are required;
--   call tools;
+-   call tools (including speech synthesis and pose biomechanics calculators);
 -   retrieve evidence;
 -   generate plans;
 -   validate outputs;
@@ -152,25 +170,13 @@ The project will measure:
 -   constraint satisfaction;
 -   personalization;
 -   safety compliance;
--   latency;
+-   latency (text, speech STT/TTS, and posture event turnaround);
 -   token usage;
 -   tool usage;
 -   message complexity;
 -   redundancy;
 -   agent-level contribution;
 -   architecture-level performance.
-
-### Multimodal Extension
-
-Phase 3 may include:
-
--   voice input;
--   image input;
--   pose landmark analysis;
--   multimodal explanations.
-
-Multimodal functionality is an extension and must not compromise the
-core agentic system.
 
 ------------------------------------------------------------------------
 
@@ -179,22 +185,18 @@ core agentic system.
 The system will **not** be presented as:
 
 -   a medical diagnosis system;
--   a treatment recommendation system;
--   a substitute for a qualified yoga instructor or healthcare
-    professional;
--   a system capable of clinically diagnosing injury from an image;
--   a fully autonomous real-time physical coach.
+-   a clinical treatment recommendation system;
+-   a substitute for a licensed physical therapist, orthopedist, or healthcare professional;
+-   a system capable of diagnosing internal injuries or musculoskeletal pathology;
+-   a guarantee against injury if user ignores safety disclaimers.
 
-Model training or fine-tuning is also not a core project requirement.
-The project evaluates **agent architecture and orchestration**, rather
-than training a foundation model.
+The real-time posture correction module is strictly an **instructional biomechanical alignment aid** based on standard geometric yoga heuristics and curated reference angles. Foundation model training is out of scope; foundation models are accessed via APIs and local lightweight vision/audio models.
 
 ------------------------------------------------------------------------
 
 # 5. Core Agent Architecture
 
-The system will use a small number of specialized agents with clearly
-separated responsibilities.
+The system uses specialized agents with clearly separated responsibilities, structured to allow modular multimodal additions.
 
   -----------------------------------------------------------------------
   Agent                   Responsibility          Primary Concepts
@@ -210,78 +212,112 @@ separated responsibilities.
   **Knowledge/RAG Agent** Retrieve and ground     RAG, ReAct, tools
                           information from the    
                           curated knowledge base  
+                          (including asana        
+                          biomechanical rules)    
 
   **Practice Planner      Generate structured     Goal-based planning,
   Agent**                 practice plans          CoT-style planning
 
   **Safety & Constraint   Validate explicit       Guardrails, KRR,
-  Agent**                 constraints and project deterministic
-                          safety rules            validation
+  Agent**                 constraints, medical    deterministic
+                          contraindications, and  validation
+                          project safety rules    
 
   **Critic/Reflection     Evaluate the generated  Reflection,
   Agent**                 plan and request        self-critique,
                           revision when needed    evaluation
+
+  **Speech / Audio Agent** Ingest user voice       Audio perception, STT,
+                          transcripts, manage     conversational pacing,
+                          conversational pacing,  TTS actuation
+                          and synthesize spoken   
+                          cues & audio responses  
+
+  **Pose Understanding &  Analyze extracted       Computer vision,
+  Correction Agent**      skeletal landmarks and  biomechanics,
+  *(Modular CV Plug-in)*  joint angles, compare   event-driven corrective
+                          with RAG asana criteria, feedback
+                          and formulate concise   
+                          real-time adjustments   
   -----------------------------------------------------------------------
 
-A later Phase 3 may add:
-
-  ---------------------------------------------------------------------
-  Agent                              Responsibility
-  ---------------------------------- ----------------------------------
-  **Pose Understanding Agent**       Analyze image-derived pose
-                                     landmarks/features and provide
-                                     non-clinical practice feedback
-
-  ---------------------------------------------------------------------
-
-The project deliberately avoids excessive agent decomposition. Each
-agent must have a measurable responsibility and a clear reason for
-existing.
+The core architecture operates with 6 core text/planning agents + 1 Speech Agent, while the **Pose Understanding & Correction Agent** is engineered as a plug-and-play module that attaches via the shared blackboard and event bus.
 
 ------------------------------------------------------------------------
 
 # 6. System Architecture
 
-YogaSutra combines several architecture patterns at different levels
-rather than treating them as mutually exclusive.
+YogaSutra combines hierarchical orchestration, blackboard shared state, and decoupled real-time event-driven streaming.
 
 ``` mermaid
+---
+config:
+  layout: elk
+---
 flowchart TB
-    U["User"] --> UI["YogaSutra Web Interface"]
-    UI --> RM["Root Manager Agent"]
+    subgraph UI_Layer["User Interaction & Multimodal Interface"]
+        U["User"]
+        MIC["Microphone / Speech Input"]
+        CAM["Webcam / Video Stream"]
+        SPEAKER["Audio Output / Spoken Cues"]
+        SCREEN["Web UI / Visual Trace & HUD"]
 
-    RM --> PA["Profile Agent"]
-    RM --> KA["Knowledge / RAG Agent"]
-    RM --> PP["Practice Planner Agent"]
+        U -->|Voice| MIC
+        U -->|Text Prompt| SCREEN
+        U -->|Live Poses| CAM
+        SPEAKER -->|Voice Guidance| U
+        SCREEN -->|Visual Feedback & Trace| U
+    end
 
-    PA --> SS[("Shared Session State")]
-    KA --> SS
-    PP --> SS
+    subgraph Audio_Vision_Pipeline["Multimodal I/O & Biomechanical Pipeline"]
+        MIC --> STT["STT Engine (Whisper / WebSpeech)"]
+        CAM --> CV["OpenCV + MediaPipe / YOLOv8-Pose"]
+        CV --> MATH["Biomechanical Joint Angle Engine"]
+    end
 
-    SS --> SV["Safety & Constraint Agent"]
-    SV --> CR["Critic / Reflection Agent"]
+    subgraph Multi_Agent_Core["YogaSutra Multi-Agent System (Google ADK)"]
+        RM["Root Manager Agent"]
+        PA["Profile Agent"]
+        KA["Knowledge / RAG Agent"]
+        PP["Practice Planner Agent"]
+        SV["Safety & Constraint Agent"]
+        CR["Critic / Reflection Agent"]
+        SA["Speech / Audio Agent"]
+        POA["Pose Understanding & Correction Agent\n(Modular CV Plug-in)"]
 
-    CR -->|PASS| FR["Final Response"]
-    CR -->|REVISION REQUIRED| PP
+        SS[("Shared Session State\n(Blackboard)")]
+        BUS{{"Event Bus / Reactive Loop"}}
+    end
 
-    FR --> UI
-    UI --> FB["User Feedback"]
-
-    FB --> EV["Session / Feedback Event"]
-    EV --> MEM[("Persistent User Memory")]
+    subgraph Storage_and_Tools["Knowledge & External Integration"]
+        KB[("PostgreSQL + pgvector\n(Asanas & Biomechanics)")]
+        MCP["MCP Tool Server"]
+        RULES[("Safety & Contraindication Rules")]
+        MEM[("Persistent User Memory")]
+    end
+    STT -->|Transcribed Text| RM
+    SCREEN -->|Text Request| RM
+    MATH -->|Keypoints & Angle Metrics| BUS
+    RM <--> SS
+    PA <--> SS
+    KA <--> SS
+    PP <--> SS
+    SV <--> SS
+    CR <--> SS
+    SA <--> SS
+    POA <--> SS
+    BUS -->|PostureDeviationEvent| POA
+    BUS -->|VoiceCommandEvent| RM
+    POA -->|Corrective Cue| SA
+    SA -->|Audio Stream| SPEAKER
+    KA --> KB
+    KA --> MCP
+    SV --> RULES
     MEM --> PA
-
-    KA --> KB[("PostgreSQL + pgvector")]
-    KA --> MCP["MCP Tool Server"]
-    PP --> TOOLS["Planning / Validation Tools"]
-    SV --> RULES[("Safety & Constraint Rules")]
-
-    RM -.-> TRACE["Execution Trace / Observability"]
-    PA -.-> TRACE
-    KA -.-> TRACE
-    PP -.-> TRACE
-    SV -.-> TRACE
-    CR -.-> TRACE
+    CR -->|PASS| SA
+    CR -->|PASS| SCREEN
+    CR -->|REVISE| PP
+    Multi_Agent_Core -.-> TRACE["Observability & Execution Trace"]
 ```
 
 ------------------------------------------------------------------------
@@ -331,19 +367,32 @@ observable and dynamic environment**.
   **Performance**                    Goal alignment, personalization,
                                      grounding, constraint
                                      satisfaction, safety compliance,
-                                     coherence, latency, user feedback
+                                     coherence, text latency, STT/TTS
+                                     speech latency, posture deviation
+                                     detection precision, real-time cue
+                                     turnaround (<2.0s), user feedback
 
-  **Environment**                    User profile, goals, preferences,
-                                     available time, prior sessions,
-                                     feedback, yoga knowledge corpus
+  **Environment**                    User profile, goals, constraints,
+                                     prior sessions, feedback history,
+                                     curated yoga knowledge &
+                                     biomechanical criteria corpus,
+                                     physical mat environment (audio &
+                                     video stream)
 
-  **Actuators**                      Ask questions, retrieve knowledge,
-                                     generate plans, validate plans,
-                                     revise outputs, record feedback
+  **Actuators**                      Ask clarifying questions, spoken
+                                     voice prompts (TTS), real-time verbal
+                                     corrective cues, UI visual skeleton
+                                     overlay & angle HUD badges, generate
+                                     plans, validate & revise plans,
+                                     persist user memory & trace metrics
 
-  **Sensors / Percepts**             Text, voice, profile data, session
-                                     history, feedback, image input,
-                                     retrieved documents
+  **Sensors / Percepts**             User text prompts, live microphone
+                                     audio stream (voice utterances),
+                                     live webcam video frames, extracted
+                                     skeletal landmarks (MediaPipe 33 3D /
+                                     YOLO-Pose 17), computed joint
+                                     angles, session history, retrieved
+                                     evidence chunks
   ---------------------------------------------------------------------
 
 The PEAS model provides the formal problem definition for the agent
@@ -412,6 +461,8 @@ flowchart TB
     PL["Planner Agent"] <--> B
     SV["Safety Agent"] <--> B
     CR["Critic Agent"] <--> B
+    SA["Speech / Audio Agent"] <--> B
+    POA["Pose Understanding Agent (CV Plug-in)"] <--> B
 ```
 
 Example state:
@@ -426,6 +477,22 @@ validation_results
 critique
 revision_count
 final_response
+
+# Multimodal Extensions (Blackboard Channels)
+audio_context:
+  input_audio_url
+  voice_transcript
+  speech_mode_active
+  output_audio_url
+
+pose_tracking_state:
+  current_asana_name
+  target_hold_duration_sec
+  current_hold_duration_sec
+  joint_angles: {knee, hip, shoulder, spine}
+  active_deviations: [{joint, delta_deg, severity, cue}]
+  overall_alignment_score
+  last_cue_timestamp
 ```
 
 The shared state provides a concrete implementation of the blackboard
@@ -446,6 +513,7 @@ flowchart TD
     R --> PL["Practice Planner"]
     R --> SV["Safety & Constraint"]
     R --> CR["Critic / Reflection"]
+    R --> SA["Speech / Audio Agent"]
 ```
 
 The manager does not perform every specialist task itself. Its purpose
@@ -455,22 +523,24 @@ is to coordinate the workflow.
 
 # 10. Workflow Architecture
 
+## 10.1 Practice Plan Generation Workflow
+
 The main practice-generation workflow is:
 
 ``` mermaid
 flowchart TD
-    A["User Request"] --> B["Perception & Request Classification"]
+    A["User Request\n(Voice or Text)"] --> B["Perception & Request Classification\n(Speech / Root Agent)"]
     B --> C["Profile / Context Retrieval"]
     C --> D["Goal & Constraint Extraction"]
-    D --> E["Knowledge Retrieval"]
+    D --> E["Knowledge Retrieval (RAG)"]
     E --> F["Practice Plan Generation"]
     F --> G["Safety & Constraint Validation"]
     G --> H["Critic / Reflection"]
 
-    H -->|Pass| I["Final Response"]
+    H -->|Pass| I["Final Response Synthesis\n(Text Trace + Spoken Audio TTS)"]
     H -->|Revision Required| F
 
-    I --> J["User Feedback"]
+    I --> J["User Feedback\n(Voice or Click)"]
     J --> K["Memory Update"]
     K --> C
 ```
@@ -480,29 +550,86 @@ prompt-response interaction.
 
 ------------------------------------------------------------------------
 
+## 10.2 Live Multimodal Practice & Posture Guidance Workflow (Decoupled Loop)
+
+When the user enters **Practice Mode**, YogaSutra runs a decoupled, dual-speed workflow:
+- A high-frequency CV loop (30 FPS) processes video frames locally;
+- An event-driven multi-agent loop triggers only when biomechanical deviations or voice queries occur.
+
+``` mermaid
+sequenceDiagram
+    autonumber
+    actor User as User (On Yoga Mat)
+    participant Cam as Webcam & OpenCV
+    participant CV as Pose Engine (MediaPipe/YOLO)
+    participant State as ADK Blackboard State
+    participant PoseAgent as Pose Understanding Agent
+    participant RAG as Knowledge / Biomechanics RAG
+    participant SpeechAgent as Speech / Audio Agent
+    participant UI as Web HUD & Speakers
+
+    User->>Cam: Live Practice Video Feed
+    Cam->>CV: Video Frames (30 FPS)
+    CV->>CV: Extract 33 Landmarks & Compute Joint Angles
+    CV->>State: Update current_joint_angles & alignment_score
+
+    alt Posture Deviation Detected (> threshold for > 1.5s)
+        CV->>State: Emit PostureDeviationEvent(joint="left_knee", angle=68, target=90)
+        State->>PoseAgent: Trigger Event
+        PoseAgent->>RAG: Retrieve Asana Alignment Evidence (Virabhadrasana II knee safety)
+        RAG-->>PoseAgent: Grounded biomechanical adjustment rule
+        PoseAgent->>PoseAgent: Formulate concise physical cue
+        PoseAgent->>SpeechAgent: Dispatch Spoken Cue ("Gently press your left knee forward over your ankle")
+        SpeechAgent->>UI: Play Audio TTS Cue (< 1.5s latency)
+        CV->>UI: Render Skeleton Wireframe & Angle HUD Badge (Green/Red)
+        UI-->>User: Spoken voice cue + Visual screen feedback
+    end
+
+    opt User Voice Query during Pose
+        User->>SpeechAgent: "How long do I hold this?"
+        SpeechAgent->>State: Read current_hold_duration_sec & target
+        SpeechAgent->>UI: Spoken Answer ("15 seconds remaining. Breathe deeply.")
+        UI-->>User: Audio Response
+    end
+```
+
+------------------------------------------------------------------------
+
 # 11. Event-Driven Architecture
 
-Event-driven behavior will be introduced primarily around session
-completion, feedback and exceptional conditions.
+Event-driven behavior governs session completion, feedback, live posture deviations, and voice commands without blocking the main workflow.
 
 ``` mermaid
 flowchart TD
-    A["Session Completed"] --> E1["SessionCompleted Event"]
+    subgraph Session_Lifecycle_Events["Session Lifecycle & Memory Events"]
+        E1["SessionCompleted Event"] --> F["Feedback Processing"]
+        E1 --> M["Memory Update"]
+        E1 --> EV["Evaluation Pipeline"]
+        F --> P["User Preference Update"]
+        M --> PM[("Persistent Memory")]
+        EV --> TS[("Evaluation Store")]
+    end
 
-    E1 --> F["Feedback Processing"]
-    E1 --> M["Memory Update"]
-    E1 --> EV["Evaluation Pipeline"]
+    subgraph RealTime_Posture_Events["Real-Time Posture & Multimodal Events"]
+        V1["Webcam Frame Ingested"] --> V2["Angle Calculation"]
+        V2 -->|Deviation > Threshold| E2["PostureDeviation Event"]
+        E2 --> POA["Pose Understanding Agent"]
+        POA --> SA["Speech / Audio Agent (TTS Cue)"]
+        
+        V2 -->|Hold Target Reached| E3["PoseHoldCompleted Event"]
+        E3 --> ADVANCE["Transition to Next Asana Sequence"]
 
-    F --> P["User Preference Update"]
-    M --> PM[("Persistent Memory")]
-    EV --> TS[("Evaluation Store")]
+        AUDIO["User Voice Utterance"] --> E4["VoiceCommand Event"]
+        E4 --> DISPATCH["Hands-Free Voice Dispatcher"]
+    end
 
-    S["Safety Concern Detected"] --> E2["SafetyConcern Event"]
-    E2 --> STOP["Stop / Request Clarification"]
+    subgraph Safety_Events["Safety Escalation Events"]
+        S["Severe Strain / Contraindication Detected"] --> E5["SafetyConcern Event"]
+        E5 --> STOP["Audio Alert: Stop & Rest / Clarify"]
+    end
 ```
 
-This allows the system to react to events without forcing every
-operation into the main synchronous workflow.
+This allows the system to react to events without forcing high-frequency frame operations into synchronous LLM workflows.
 
 ------------------------------------------------------------------------
 
@@ -720,7 +847,7 @@ The final system should be able to answer:
 Agents will use narrowly scoped tools rather than arbitrary unrestricted
 access.
 
-Initial tools:
+### Core Planning & Knowledge Tools:
 
 ``` text
 retrieve_yoga_knowledge()
@@ -732,10 +859,26 @@ record_feedback()
 get_source_metadata()
 ```
 
-Possible Phase 3 tools:
+### Speech & Audio Tools (Active Scope):
 
 ``` text
-analyze_pose_landmarks()
+transcribe_speech_audio(audio_bytes, language) -> transcript, confidence
+synthesize_speech_feedback(text_cue, tone_style, speaking_rate) -> audio_url
+dispatch_audio_guidance(cue_text, priority) -> bool
+```
+
+### Modular Video & Posture Analysis Tools (CV Extension Plug-in):
+
+``` text
+extract_pose_landmarks(frame_image) -> landmarks_3d, visibility_scores
+compute_joint_biomechanics(landmarks_3d) -> joint_angles_dict
+compare_pose_against_standard(asana_id, joint_angles) -> deviation_report
+generate_posture_cue(deviation_report, persona_level) -> concise_verbal_cue
+```
+
+### Advanced Planning Tools (Phase 3):
+
+``` text
 generate_plan_candidates()
 evaluate_candidate_plan()
 ```
@@ -804,6 +947,20 @@ candidate_plan
 validation_results
 critique
 revision_count
+
+# Voice & Practice Session Context
+audio_context:
+  voice_transcript_history
+  active_speech_mode
+  last_audio_cue_id
+
+# Real-Time Practice Pose State
+pose_tracking_session:
+  active_asana
+  pose_start_timestamp
+  accumulated_hold_seconds
+  joint_angles_live
+  deviations_logged: list[dict]
 ```
 
 ## Persistent User Memory
@@ -817,6 +974,13 @@ historical_goals
 practice_history
 feedback_patterns
 preferred_duration
+
+# Biomechanical & Multimodal Progress Memory
+posture_biomechanics_profile:
+  flexibility_baseline: {hip, hamstring, shoulder}
+  recurring_alignment_tendencies: ["knee_valgus_inward", "rounded_lumbar"]
+  average_hold_stability_score
+  preferred_audio_guidance_density: "minimal" | "detailed"
 ```
 
 Architecture:
@@ -1905,43 +2069,44 @@ collection of API integrations.
 
 ## Phase 1
 
--   [ ] Problem statement approved
--   [ ] PEAS completed
--   [ ] Environment analysis completed
--   [ ] Agent responsibilities defined
--   [ ] Architecture diagrams completed
--   [ ] RAG strategy defined
--   [ ] Reasoning strategy defined
--   [ ] Communication strategy defined
--   [ ] Tech stack justified
--   [ ] Timeline completed
--   [ ] Team responsibility matrix completed
--   [ ] Minimal ADK prototype demonstrated
+-   [x] Problem statement approved
+-   [x] PEAS completed
+-   [x] Environment analysis completed
+-   [x] Agent responsibilities defined
+-   [x] Architecture diagrams completed
+-   [x] RAG strategy defined
+-   [x] Reasoning strategy defined
+-   [x] Communication strategy defined
+-   [x] Tech stack justified
+-   [x] Timeline completed
+-   [x] Team responsibility matrix completed
+-   [x] Minimal ADK prototype demonstrated
 
 ## Phase 2
 
 -   [ ] Six core agents operational
+-   [ ] Speech / Audio Agent operational (bidirectional STT/TTS hands-free loop)
 -   [ ] Sequential workflow operational
 -   [ ] Hierarchical workflow operational
--   [ ] Shared state operational
--   [ ] RAG operational
--   [ ] Tools operational
+-   [ ] Shared state operational (including audio & pose event blackboard channels)
+-   [ ] RAG operational (grounding asana sequences & biomechanical alignment standards)
+-   [ ] Tools operational (including speech transcription & synthesis)
 -   [ ] Safety validation operational
 -   [ ] Critic/reflection operational
 -   [ ] Persistent memory operational
 -   [ ] MCP integration operational
 -   [ ] Structured traces operational
--   [ ] Working frontend
+-   [ ] Working frontend with speech interaction
 -   [ ] Model gateway abstraction operational
 -   [ ] At least three model providers integrated
 -   [ ] Initial latency benchmark available
 
 ## Phase 3
 
--   [ ] 40+ evaluation runs completed
+-   [ ] 40+ evaluation runs completed (including speech and live pose test scenarios)
 -   [ ] Persona-linked evaluation completed
 -   [ ] Architecture comparison completed
--   [ ] Agent bottleneck analysis completed
+-   [ ] Agent bottleneck analysis completed (including speech and CV latency)
 -   [ ] Multi-model comparison completed
 -   [ ] Dynamic model routing operational
 -   [ ] Model capability registry operational
@@ -1949,7 +2114,8 @@ collection of API integrations.
 -   [ ] Reflection experiment completed
 -   [ ] Advanced planning evaluated
 -   [ ] Event-driven memory operational
--   [ ] Multimodal extension implemented where feasible
+-   [ ] Modular real-time computer vision posture correction plug-in operational (OpenCV + MediaPipe/YOLO)
+-   [ ] Live Practice Studio UI operational (video canvas, skeleton HUD, spoken cues)
 -   [ ] Docker Compose production-like runtime operational
 -   [ ] Docker-based caching/concurrency/resource controls evaluated
 -   [ ] End-to-end latency benchmark completed
@@ -2159,7 +2325,7 @@ September → October, culminating in the October Phase 2 evaluation.
 
 ### Goal
 
-Build the complete core agentic workflow.
+Build the complete core agentic workflow with bidirectional hands-free speech communication.
 
 ### Implement
 
@@ -2171,13 +2337,14 @@ Build the complete core agentic workflow.
 -   Planner
 -   Safety
 -   Critic
+-   **Speech / Audio Agent** (bidirectional STT transcription & TTS spoken synthesis)
 
 #### Orchestration
 
 -   sequential workflow;
 -   hierarchical manager;
 -   parallel/broadcast experiment;
--   shared-state/blackboard workflow.
+-   shared-state/blackboard workflow (including audio channels).
 
 #### Tools
 
@@ -2186,11 +2353,12 @@ Build the complete core agentic workflow.
 -   history;
 -   validation;
 -   duration calculation;
+-   speech transcription & synthesis;
 -   feedback.
 
 #### Memory
 
--   session state;
+-   session state (including voice conversation state);
 -   persistent user context.
 
 #### Safety
@@ -2206,7 +2374,7 @@ Build the complete core agentic workflow.
 #### Observability
 
 -   structured traces;
--   per-agent timing;
+-   per-agent timing (including STT/TTS latency);
 -   tool calls;
 -   state transitions.
 
@@ -2218,20 +2386,22 @@ Build the complete core agentic workflow.
 
 ``` mermaid
 flowchart TD
-    U["User"] --> R["Root Manager"]
+    U["User\n(Voice or Text)"] --> SA["Speech / Audio Agent"]
+    U --> R["Root Manager"]
+    SA --> R
 
     R --> P["Profile"]
     R --> K["Knowledge / RAG"]
     R --> PL["Planner"]
 
-    P --> S[("Shared State")]
+    P --> S[("Shared State\n(Blackboard)")]
     K --> S
     PL --> S
 
     S --> SV["Safety"]
     SV --> CR["Critic"]
 
-    CR -->|Pass| F["Final Response"]
+    CR -->|Pass| F["Final Response\n(Text Trace + Spoken Voice)"]
     CR -->|Revise| PL
 
     F --> U
@@ -2241,7 +2411,7 @@ flowchart TD
 
 -   updated charter;
 -   revised timeline;
--   working prototype;
+-   working prototype with speech communication;
 -   source repository;
 -   progress report;
 -   demonstration;
@@ -2301,7 +2471,7 @@ At least 40 runs; target 44+.
 
 ------------------------------------------------------------------------
 
-# Phase 3 --- Final Agentic System
+# Phase 3 --- Final Agentic System & Modular CV Posture Extension
 
 ### Target
 
@@ -2309,10 +2479,19 @@ Late October → final evaluation.
 
 ### Goal
 
-Turn the core prototype into the final demonstrable system and validate
-the agentic design experimentally.
+Turn the core prototype into the final demonstrable system, validate
+the agentic design experimentally, and activate the **modular real-time video posture correction plug-in**.
 
 ### Add
+
+#### Modular Real-Time Computer Vision Posture Module (CV Extension Plug-in)
+
+-   **Video Ingestion**: Local webcam / video stream worker via OpenCV;
+-   **Pose Extraction**: MediaPipe Pose (33 3D skeletal landmarks) and optional YOLOv8-pose;
+-   **Biomechanical Angle Calculator**: Fast, deterministic joint angle computation (knee flexion, hip-shoulder symmetry, spinal alignment);
+-   **Pose Understanding & Correction Agent**: Event-driven agent comparing live joint angles with RAG asana criteria;
+-   **Real-Time Closed Feedback Loop**: Dispatches high-priority spoken voice guidance via Speech Agent and visual wireframe HUD overlay;
+-   **Decoupled Architecture**: High-speed vision worker communicates asynchronously with ADK session state via events, ensuring zero lag on main agent planning.
 
 #### Advanced Planning
 
@@ -2324,18 +2503,14 @@ the agentic design experimentally.
 -   session-completed event;
 -   feedback event;
 -   memory-update workflow;
--   safety escalation events.
-
-#### Multimodal
-
--   voice input;
--   image input;
--   optional pose landmark analysis.
+-   safety escalation events;
+-   real-time posture deviation events (`PostureDeviationEvent`).
 
 #### Advanced Memory
 
 -   preference extraction;
 -   historical feedback;
+-   posture biomechanics profile & progress history;
 -   personalization.
 
 #### Observability
@@ -2343,21 +2518,22 @@ the agentic design experimentally.
 -   trace dashboard;
 -   MAS-level analysis;
 -   agent-level analysis;
--   latency bottleneck visualization.
+-   latency bottleneck visualization (including CV frame rate and audio cue latency).
 
 #### Evaluation
 
--   40+ completed runs;
+-   40+ completed runs (including multimodal voice and posture scenarios);
 -   architecture comparison;
 -   model comparison;
 -   grounding analysis;
 -   reflection analysis;
--   safety analysis.
+-   safety analysis;
+-   posture correction precision & response latency analysis.
 
 #### Deployment
 
 -   production-like deployment;
--   frontend;
+-   frontend (Next.js with Live Practice Studio canvas & voice visualizer);
 -   backend/ADK service;
 -   observability;
 -   reproducible configuration.
@@ -2368,49 +2544,64 @@ the agentic design experimentally.
 
 ``` mermaid
 flowchart TB
-    U["User"] --> UI["Next.js Interface"]
+    subgraph UI_Layer["Next.js Multimodal Interface"]
+        UI["Web UI Dashboard"]
+        VOICE["Microphone & Audio Player"]
+        VISION["Live Practice Video Canvas"]
+    end
 
     UI --> R["Root Manager"]
+    VOICE <--> SA["Speech / Audio Agent"]
+    SA <--> R
 
-    subgraph MAS["YogaSutra Multi-Agent System"]
+    subgraph MAS["YogaSutra Multi-Agent Core System"]
         R --> P["Profile Agent"]
         R --> K["Knowledge / RAG Agent"]
         R --> PL["Practice Planner"]
         R --> SV["Safety & Constraint"]
         R --> CR["Critic / Reflection"]
+        R --> SA
 
-        P <--> ST[("ADK Session State")]
+        P <--> ST[("ADK Session State\n(Blackboard)")]
         K <--> ST
         PL <--> ST
         SV <--> ST
         CR <--> ST
+        SA <--> ST
 
         CR -->|Pass| OUT["Final Response"]
         CR -->|Revision| PL
     end
 
-    K --> PG[("PostgreSQL + pgvector")]
+    subgraph CV_Plugin["Modular Computer Vision Plug-in (Practice Mode)"]
+        VISION --> CAM["OpenCV Video Stream"]
+        CAM --> MP["MediaPipe / YOLO-Pose Engine"]
+        MP --> GEOM["Joint Angle & Biomechanics Analyzer"]
+        GEOM -->|PostureDeviationEvent| POA["Pose Understanding & Correction Agent"]
+        POA <--> ST
+        POA -->|Spoken Cue| SA
+        GEOM -->|Skeleton Overlay & HUD| VISION
+    end
+
+    K --> PG[("PostgreSQL + pgvector\n(Asanas & Biomechanics)")]
     K --> MCP["MCP Server"]
     SV --> RULES[("Constraint / Safety Rules")]
 
     OUT --> UI
+    OUT --> SA
     UI --> FB["Feedback Event"]
     FB --> MEM[("Persistent User Memory")]
     MEM --> P
 
     subgraph OBS["Observability & Evaluation"]
         TRACE["Execution Traces"]
-        MET["Metrics"]
+        MET["Metrics (Latency, WER, CV FPS)"]
         EVAL["Evaluation Engine"]
         DASH["Analysis Dashboard"]
     end
 
-    R -.-> TRACE
-    P -.-> TRACE
-    K -.-> TRACE
-    PL -.-> TRACE
-    SV -.-> TRACE
-    CR -.-> TRACE
+    MAS -.-> TRACE
+    CV_Plugin -.-> TRACE
 
     TRACE --> MET
     MET --> EVAL
@@ -2554,7 +2745,12 @@ yoga-sutra/
 │   │   ├── knowledge/
 │   │   ├── planner/
 │   │   ├── safety/
-│   │   └── critic/
+│   │   ├── critic/
+│   │   ├── speech/                 # Speech & Audio Agent (STT/TTS conversational loop)
+│   │   └── pose/                   # Modular CV: Pose Understanding & Correction Agent
+│   │
+│   ├── audio/                      # Speech streaming, Whisper/WebSpeech STT & TTS synthesizer
+│   ├── vision/                     # Modular CV: OpenCV capture, MediaPipe 3D / YOLO-Pose, joint angles
 │   │
 │   ├── workflows/
 │   │   ├── sequential.py
@@ -2572,7 +2768,7 @@ yoga-sutra/
 │   ├── tracing/
 │   └── evaluation/
 │
-├── frontend/
+├── frontend/                       # Next.js UI with Live Practice Studio (HUD & Voice widget)
 │
 ├── data/
 │   ├── knowledge/
@@ -2720,14 +2916,11 @@ assume a preferred architecture.
 
 ------------------------------------------------------------------------
 
-## DD-07 --- Multimodality Is Phase 3
+## DD-07 --- Multimodal Phasing & Decoupled Architecture
 
-**Decision:** Delay multimodal functionality until the core agentic
-system works.
+**Decision:** Promote bidirectional Speech Communication to Phase 2 core scope; engineer Real-Time Video Posture Correction as a decoupled plug-and-play module for Phase 3.
 
-**Reason:** Multimodal features are valuable, but they should not
-consume time needed to establish the required multi-agent architecture,
-RAG, communication, observability and evaluation.
+**Reason:** Yoga practice is inherently physical and hands-free; voice communication (STT/TTS) is natural and immediately elevates the human-agent interaction without altering the core planning orchestration. The high-speed computer vision pipeline (OpenCV + MediaPipe/YOLO) is isolated behind asynchronous event triggers (`PostureDeviationEvent`), ensuring the core multi-agent reasoning, RAG, and evaluation remain intact while enabling a plug-and-play demonstration.
 
 ------------------------------------------------------------------------
 
@@ -2775,7 +2968,10 @@ medical diagnosis or treatment claims.
   MCP complexity          Medium                  One meaningful MCP
                                                   integration first
 
-  Multimodal scope creep  High                    Phase 3 only
+  Multimodal scope creep  High                    Decoupled architecture:
+                                                  speech uses standard
+                                                  STT/TTS; CV runs as an
+                                                  isolated async event worker
 
   Evaluation subjectivity Medium                  Deterministic metrics +
                                                   LLM judge + human
@@ -2802,46 +2998,48 @@ medical diagnosis or treatment claims.
 
 ## Phase 1
 
--   [ ] Problem statement approved
--   [ ] PEAS completed
--   [ ] Environment analysis completed
--   [ ] Agent responsibilities defined
--   [ ] Architecture diagrams completed
--   [ ] RAG strategy defined
--   [ ] Reasoning strategy defined
--   [ ] Communication strategy defined
--   [ ] Tech stack justified
--   [ ] Timeline completed
--   [ ] Team responsibility matrix completed
--   [ ] Minimal ADK prototype demonstrated
+-   [x] Problem statement approved
+-   [x] PEAS completed
+-   [x] Environment analysis completed
+-   [x] Agent responsibilities defined
+-   [x] Architecture diagrams completed
+-   [x] RAG strategy defined
+-   [x] Reasoning strategy defined
+-   [x] Communication strategy defined
+-   [x] Tech stack justified
+-   [x] Timeline completed
+-   [x] Team responsibility matrix completed
+-   [x] Minimal ADK prototype demonstrated
 
 ## Phase 2
 
 -   [ ] Six core agents operational
+-   [ ] Speech / Audio Agent operational (bidirectional STT/TTS hands-free loop)
 -   [ ] Sequential workflow operational
 -   [ ] Hierarchical workflow operational
--   [ ] Shared state operational
--   [ ] RAG operational
--   [ ] Tools operational
+-   [ ] Shared state operational (including audio & pose blackboard channels)
+-   [ ] RAG operational (grounding practice plans & asana alignment standards)
+-   [ ] Tools operational (including speech transcription & synthesis)
 -   [ ] Safety validation operational
 -   [ ] Critic/reflection operational
 -   [ ] Persistent memory operational
 -   [ ] MCP integration operational
 -   [ ] Structured traces operational
--   [ ] Working frontend
+-   [ ] Working frontend with speech interaction
 -   [ ] Initial evaluation suite
 
 ## Phase 3
 
--   [ ] 40+ evaluation runs completed
+-   [ ] 40+ evaluation runs completed (including speech and live pose test scenarios)
 -   [ ] Persona-linked evaluation completed
 -   [ ] Architecture comparison completed
--   [ ] Agent bottleneck analysis completed
--   [ ] Model comparison completed
+-   [ ] Agent bottleneck analysis completed (including speech and CV turnaround)
+-   [ ] Multi-model comparison completed
 -   [ ] Reflection experiment completed
 -   [ ] Advanced planning evaluated
 -   [ ] Event-driven memory operational
--   [ ] Multimodal extension implemented where feasible
+-   [ ] Modular real-time computer vision posture correction plug-in operational (OpenCV + MediaPipe/YOLO)
+-   [ ] Live Practice Studio UI operational (video canvas, skeleton HUD, spoken cues)
 -   [ ] Observability dashboard operational
 -   [ ] Deployment completed
 -   [ ] Final report completed
