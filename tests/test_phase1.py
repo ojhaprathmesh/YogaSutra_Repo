@@ -7,15 +7,10 @@ Validates that the Phase 1 implementation aligns with PLAN.md (§35 & §43):
 - Phase 1 pipeline visualizer nodes (5 agents, no Safety/Critic in Phase 1)
 - Phase 1 session state & execution trace recording
 """
-import pytest
-
-from app.agents.knowledge.agent import knowledge_agent
-from app.agents.planner.agent import planner_agent
-from app.agents.profile.agent import profile_agent
-from app.agents.root.agent import phase1_root_agent, phase2_root_agent, response_agent
+from app.agents.root.agent import phase1_root_agent, phase2_root_agent
 from app.state import YogaSessionState
 from app.tracing.trace import ExecutionTrace
-from app.ui.live_graph import PipelineGraph, PIPELINE_NODES_PHASE1, PIPELINE_NODES
+from app.ui.live_graph import PipelineGraph, PIPELINE_NODES_PHASE1
 from main import DEFAULT_INPUT
 
 

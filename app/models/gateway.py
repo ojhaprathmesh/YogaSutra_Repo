@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import ssl
 import time
 import urllib.error
 import urllib.request
@@ -23,6 +24,13 @@ from app.models.cache import response_cache
 from app.models.rate_limiter import rate_limiter
 
 logger = logging.getLogger("yogasutra.gateway")
+
+
+def _make_ssl_context() -> ssl.SSLContext:
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    return ctx
 
 
 @dataclass
@@ -47,6 +55,7 @@ class ModelGateway:
         self.google_api_key = os.environ.get("GOOGLE_API_KEY", "").strip()
         self.nvidia_api_key = os.environ.get("NVIDIA_API_KEY", "").strip()
         self.ollama_api_key = os.environ.get("OLLAMA_API_KEY", "").strip()
+        self._ssl_ctx = _make_ssl_context()
 
     def generate(
         self,
@@ -144,7 +153,7 @@ class ModelGateway:
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=30) as response:
+        with urllib.request.urlopen(req, timeout=30, context=self._ssl_ctx) as response:
             data = json.loads(response.read().decode("utf-8"))
 
         content = ""
@@ -196,7 +205,7 @@ class ModelGateway:
             },
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=45) as response:
+        with urllib.request.urlopen(req, timeout=45, context=self._ssl_ctx) as response:
             data = json.loads(response.read().decode("utf-8"))
 
         content = data.get("response", "")
@@ -244,7 +253,7 @@ class ModelGateway:
             },
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=30) as response:
+        with urllib.request.urlopen(req, timeout=30, context=self._ssl_ctx) as response:
             data = json.loads(response.read().decode("utf-8"))
 
         content = ""

@@ -1,7 +1,6 @@
 """
 tests/test_gateway.py — Unit tests for ModelGateway, ModelRouter, and Cache.
 """
-import pytest
 from app.models.cache import ResponseCache
 from app.models.gateway import ModelGateway, ModelResponse
 from app.models.rate_limiter import TokenBucketRateLimiter

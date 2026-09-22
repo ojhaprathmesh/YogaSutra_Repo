@@ -9,7 +9,6 @@ Exposes structured yoga domain capabilities via the standardized MCP tool interf
 """
 from __future__ import annotations
 
-import json
 import logging
 from typing import Any
 

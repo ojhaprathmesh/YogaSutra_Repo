@@ -20,8 +20,8 @@ from app.audio.cache import audio_cache
 
 logger = logging.getLogger("yogasutra.elevenlabs")
 
-# Default voice: "Rachel" (21m00Tcm4TlvDq8ikWAM) — warm, calming, meditative tone
-DEFAULT_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"
+# Default voice: "Sarah" (EXAVITQu4vr4xnSDxMaL) — reassuring, mature, confident yoga guide (Free Tier Supported)
+DEFAULT_VOICE_ID = "EXAVITQu4vr4xnSDxMaL"
 import ssl
 
 DEFAULT_MODEL_ID = "eleven_turbo_v2_5"

@@ -2,8 +2,6 @@
 tests/test_audio.py — Unit tests for Speech Subsystem, ElevenLabs, and Audio Tools
 """
 import json
-from pathlib import Path
-import pytest
 
 from app.audio.cache import AudioCache
 from app.audio.elevenlabs import ElevenLabsClient

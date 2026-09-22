@@ -10,7 +10,6 @@ import json
 import logging
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
 
 logger = logging.getLogger("yogasutra.memory.user_store")
 

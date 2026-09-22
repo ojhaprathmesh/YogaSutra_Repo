@@ -11,7 +11,6 @@ Prints the final response and execution trace summary to stdout using Rich.
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import sys
 import warnings
@@ -36,7 +35,6 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.rule import Rule
 from rich.table import Table
-from rich import print as rprint
 
 console = Console()
 

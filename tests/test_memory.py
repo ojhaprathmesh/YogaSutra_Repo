@@ -1,9 +1,7 @@
 """
 tests/test_memory.py — Unit tests for Persistent UserStore and SessionStore
 """
-import pytest
-from pathlib import Path
-from app.memory.user_store import UserStore, UserContext
+from app.memory.user_store import UserStore
 from app.memory.session_store import SessionStore
 
 

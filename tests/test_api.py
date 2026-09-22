@@ -1,7 +1,6 @@
 """
 tests/test_api.py — Unit and integration tests for FastAPI Web Server & Speech Studio
 """
-import pytest
 from fastapi.testclient import TestClient
 from app.api.server import app
 

@@ -19,16 +19,13 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from app.audio.elevenlabs import elevenlabs_client
 from app.audio.tts import tts_engine
 from app.audio.stt import stt_adapter
-from app.audio.cache import audio_cache
 from app.mcp.server import mcp_server
 from app.models.gateway import model_gateway
-from app.models.router import model_router, TaskComplexity
 from app.runner import run_yogasutra
 
 logger = logging.getLogger("yogasutra.api")
@@ -67,7 +64,7 @@ class PracticeRequest(BaseModel):
 
 class SynthesisRequest(BaseModel):
     text: str
-    voice_id: str = "21m00Tcm4TlvDq8ikWAM"
+    voice_id: str = "EXAVITQu4vr4xnSDxMaL"
     prefer_elevenlabs: bool = True
 
 

@@ -38,10 +38,9 @@ logging.getLogger("google.adk").setLevel(logging.ERROR)
 
 from dotenv import load_dotenv
 from google.adk.runners import InMemoryRunner
-from google.adk.sessions import InMemorySessionService
 from google.genai import types as genai_types
 
-from app.agents.root.agent import phase1_root_agent, phase2_root_agent, root_agent
+from app.agents.root.agent import phase1_root_agent, phase2_root_agent
 from app.tracing.trace import ExecutionTrace
 
 # Load .env if present

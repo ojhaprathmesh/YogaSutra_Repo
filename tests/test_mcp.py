@@ -1,7 +1,6 @@
 """
 tests/test_mcp.py — Unit tests for YogaSutra MCP Server and Client
 """
-import pytest
 from app.mcp.server import YogaSutraMCPServer
 from app.mcp.client import YogaSutraMCPClient
 

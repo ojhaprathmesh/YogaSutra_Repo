@@ -8,7 +8,6 @@ Tools for:
 from __future__ import annotations
 
 import json
-from typing import Any
 
 from app.audio.stt import stt_adapter
 from app.audio.tts import tts_engine

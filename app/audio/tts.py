@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from pathlib import Path
 
 from app.audio.elevenlabs import elevenlabs_client
 
@@ -48,13 +47,13 @@ class HybridTTSEngine:
             return SpokenCue(text="")
 
         if prefer_elevenlabs and self.elevenlabs.is_configured:
-            audio_path = self.elevenlabs.synthesize(clean_text, voice_id=voice_id or "21m00Tcm4TlvDq8ikWAM")
+            audio_path = self.elevenlabs.synthesize(clean_text, voice_id=voice_id or "EXAVITQu4vr4xnSDxMaL")
             if audio_path and audio_path.exists():
                 return SpokenCue(
                     text=clean_text,
                     audio_path=str(audio_path),
                     provider="elevenlabs",
-                    voice_name="Rachel",
+                    voice_name="Sarah",
                 )
 
         # Fallback to browser Web Speech API cue payload

@@ -2,7 +2,6 @@
 tests/test_workflows.py — Unit tests for Workflow Paradigms (Sequential, Hierarchical, Broadcast, Blackboard)
 """
 import pytest
-import asyncio
 from app.workflows.blackboard import Blackboard
 from app.workflows.sequential import SequentialWorkflow
 from app.workflows.hierarchical import HierarchicalWorkflow, UserIntent

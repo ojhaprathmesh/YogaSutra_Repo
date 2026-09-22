@@ -9,7 +9,6 @@ Specialized agent responsible for validating candidate yoga practice plans:
 from __future__ import annotations
 
 import os
-from typing import Any
 
 from google.adk.agents import LlmAgent
 
