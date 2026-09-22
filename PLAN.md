@@ -2165,22 +2165,22 @@ collection of API integrations.
 
 ## Phase 2
 
--   [ ] Six core agents operational
--   [ ] Speech / Audio Agent operational (bidirectional STT/TTS hands-free loop)
--   [ ] Sequential workflow operational
--   [ ] Hierarchical workflow operational
--   [ ] Shared state operational (including audio & pose event blackboard channels)
--   [ ] RAG operational with atomic claim-to-chunk provenance (`source_file`, `chunk_id`, `line_range`)
--   [ ] Tools operational (including speech transcription, synthesis, and chunk claim verification)
--   [ ] Safety validation operational
--   [ ] Critic/reflection operational (verifying plan claims against referenced chunk evidence)
--   [ ] Persistent memory operational
--   [ ] MCP integration operational
--   [ ] Structured traces operational with chunk provenance claims
--   [ ] Working frontend with speech interaction
--   [ ] Model gateway abstraction operational
--   [ ] At least three model providers integrated
--   [ ] Initial latency benchmark available
+-   [x] Six core agents operational
+-   [x] Speech / Audio Agent operational (bidirectional STT/TTS hands-free loop)
+-   [x] Sequential workflow operational
+-   [x] Hierarchical workflow operational
+-   [x] Shared state operational (including audio & pose event blackboard channels)
+-   [x] RAG operational with atomic claim-to-chunk provenance (`source_file`, `chunk_id`, `line_range`)
+-   [x] Tools operational (including speech transcription, synthesis, and chunk claim verification)
+-   [x] Safety validation operational
+-   [x] Critic/reflection operational (verifying plan claims against referenced chunk evidence)
+-   [x] Persistent memory operational
+-   [x] MCP integration operational
+-   [x] Structured traces operational with chunk provenance claims
+-   [x] Working frontend with speech interaction
+-   [x] Model gateway abstraction operational
+-   [x] At least three model providers integrated
+-   [x] Initial latency benchmark available
 
 ## Phase 3
 
@@ -3106,20 +3106,20 @@ medical diagnosis or treatment claims.
 
 ## Phase 2
 
--   [ ] Six core agents operational
--   [ ] Speech / Audio Agent operational (bidirectional STT/TTS hands-free loop)
--   [ ] Sequential workflow operational
--   [ ] Hierarchical workflow operational
--   [ ] Shared state operational (including audio & pose blackboard channels)
--   [ ] RAG operational with atomic claim-to-chunk provenance (`source_file`, `chunk_id`, `line_range`)
--   [ ] Tools operational (including speech transcription, synthesis, and chunk claim verification)
--   [ ] Safety validation operational
--   [ ] Critic/reflection operational (verifying plan claims against referenced chunk evidence)
--   [ ] Persistent memory operational
--   [ ] MCP integration operational
--   [ ] Structured traces operational with chunk provenance claims
--   [ ] Working frontend with speech interaction
--   [ ] Initial evaluation suite
+-   [x] Six core agents operational
+-   [x] Speech / Audio Agent operational (bidirectional STT/TTS hands-free loop)
+-   [x] Sequential workflow operational
+-   [x] Hierarchical workflow operational
+-   [x] Shared state operational (including audio & pose blackboard channels)
+-   [x] RAG operational with atomic claim-to-chunk provenance (`source_file`, `chunk_id`, `line_range`)
+-   [x] Tools operational (including speech transcription, synthesis, and chunk claim verification)
+-   [x] Safety validation operational
+-   [x] Critic/reflection operational (verifying plan claims against referenced chunk evidence)
+-   [x] Persistent memory operational
+-   [x] MCP integration operational
+-   [x] Structured traces operational with chunk provenance claims
+-   [x] Working frontend with speech interaction
+-   [x] Initial evaluation suite
 
 ## Phase 3
 

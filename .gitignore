@@ -47,4 +47,4 @@ logs/
 .ruff_cache/
 
 # Temp plans
-**_PLAN.md
+plans/

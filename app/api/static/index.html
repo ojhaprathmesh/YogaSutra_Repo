@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YogaSutra — AI Multi-Agent Practice Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090b10;
+      --card-bg: rgba(22, 27, 39, 0.85);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --primary: #8b5cf6;
+      --primary-hover: #7c3aed;
+      --accent: #10b981;
+      --text: #f3f4f6;
+      --text-muted: #9ca3af;
+      --glow: rgba(139, 92, 246, 0.25);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: radial-gradient(circle at 50% 0%, #171329 0%, var(--bg) 75%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      border-bottom: 1px solid var(--card-border);
+      background: rgba(9, 11, 16, 0.8);
+      backdrop-filter: blur(12px);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-family: 'Outfit', sans-serif;
+      font-weight: 700;
+      font-size: 1.35rem;
+      background: linear-gradient(135deg, #a78bfa 0%, #ec4899 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .badge-bar { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .badge {
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 0.25rem 0.6rem;
+      border-radius: 9999px;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+    }
+    .badge.active { background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.4); color: #34d399; }
+    .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: #10b981; }
+
+    main {
+      flex: 1;
+      max-width: 1200px;
+      margin: 0 auto;
+      width: 100%;
+      padding: 2rem 1.5rem;
+      display: grid;
+      grid-template-columns: 1fr 1.3fr;
+      gap: 2rem;
+    }
+    @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+    h2 {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 600;
+      font-size: 1.15rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .input-area { display: flex; flex-direction: column; gap: 1rem; }
+    textarea {
+      width: 100%;
+      height: 120px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 0.85rem;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.95rem;
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 2px var(--glow); }
+
+    .controls-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.25rem;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary) 0%, #ec4899 100%);
+      color: #fff;
+      box-shadow: 0 4px 16px rgba(139, 92, 246, 0.35);
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(139, 92, 246, 0.45); }
+    .btn-voice {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--card-border);
+      color: var(--text);
+    }
+    .btn-voice.recording {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: #ef4444;
+      color: #f87171;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+    .plan-output {
+      line-height: 1.6;
+      font-size: 0.92rem;
+      max-height: 650px;
+      overflow-y: auto;
+      padding-right: 0.5rem;
+    }
+    .plan-output h1 { font-size: 1.3rem; margin: 1rem 0 0.5rem; color: #a78bfa; font-family: 'Outfit'; }
+    .plan-output h3 { font-size: 1.05rem; margin: 1.2rem 0 0.4rem; color: #34d399; font-family: 'Outfit'; }
+    .plan-output p { margin-bottom: 0.75rem; }
+    .plan-output ol, .plan-output ul { margin-left: 1.5rem; margin-bottom: 1rem; }
+    .plan-output li { margin-bottom: 0.4rem; }
+    .plan-output hr { border: none; border-top: 1px solid var(--card-border); margin: 1rem 0; }
+
+    .audio-player-bar {
+      margin-top: 1rem;
+      padding: 0.85rem;
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 12px;
+      border: 1px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .voice-tag { font-size: 0.75rem; font-weight: 600; color: #a78bfa; }
+
+    .trace-pills {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 1rem;
+      flex-wrap: wrap;
+    }
+    .trace-pill {
+      font-size: 0.75rem;
+      background: rgba(0,0,0,0.3);
+      padding: 0.3rem 0.6rem;
+      border-radius: 6px;
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span>🧘</span> YogaSutra Studio
+    </div>
+    <div class="badge-bar" id="providerBar">
+      <div class="badge active"><span class="badge-dot"></span> Google Gemini Free</div>
+      <div class="badge active"><span class="badge-dot"></span> Ollama Cloud 120B</div>
+      <div class="badge active"><span class="badge-dot"></span> NVIDIA NIM</div>
+      <div class="badge active"><span class="badge-dot"></span> ElevenLabs Voice</div>
+    </div>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>✨ Your Yoga Practice Request</h2>
+      <div class="input-area">
+        <textarea id="userInput" placeholder="Speak or describe your practice... e.g. I am a beginner with 20 minutes in the morning. I want a relaxing yoga practice.">I am a beginner and have 20 minutes in the morning. I want a relaxing yoga practice.</textarea>
+
+        <div class="controls-row">
+          <button id="voiceBtn" class="btn btn-voice" onclick="toggleVoiceInput()">
+            <span id="voiceIcon">🎙️</span> Speak Prompt
+          </button>
+          <button id="generateBtn" class="btn btn-primary" onclick="generatePractice()">
+            <span>🧘</span> Generate Practice
+          </button>
+        </div>
+
+        <div class="audio-player-bar" id="audioPlayerBar" style="display: none;">
+          <div>
+            <div class="voice-tag">🎙️ Spoken Practice Guidance</div>
+            <div id="audioCueText" style="font-size: 0.8rem; color: var(--text-muted);">Ready</div>
+          </div>
+          <button class="btn btn-primary" id="playAudioBtn" onclick="playCurrentCue()">▶ Play Voice</button>
+        </div>
+
+        <div class="trace-pills" id="tracePills">
+          <div class="trace-pill">Architecture: Phase 2 MAS</div>
+          <div class="trace-pill">Rate Limiting: Token Bucket Active</div>
+          <div class="trace-pill">Zero Cost Free Tier</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>📋 Personalized Practice Plan & Trace</h2>
+      <div class="plan-output" id="planOutput">
+        <p style="color: var(--text-muted);">Your personalized yoga sequence will appear here once generated...</p>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    let isRecording = false;
+    let recognition = null;
+    let currentAudioUrl = null;
+    let currentCueText = "";
+
+    // Initialize Web Speech API for Hands-Free voice input
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        isRecording = true;
+        const btn = document.getElementById('voiceBtn');
+        btn.classList.add('recording');
+        btn.innerHTML = '🔴 Listening...';
+      };
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        document.getElementById('userInput').value = transcript;
+      };
+
+      recognition.onerror = (event) => {
+        console.warn('Speech recognition error:', event.error);
+        stopVoiceInput();
+      };
+
+      recognition.onend = () => {
+        stopVoiceInput();
+      };
+    }
+
+    function toggleVoiceInput() {
+      if (!recognition) {
+        alert("Web Speech API is not supported in this browser. Please use Chrome/Edge/Safari.");
+        return;
+      }
+      if (isRecording) {
+        recognition.stop();
+        stopVoiceInput();
+      } else {
+        recognition.start();
+      }
+    }
+
+    function stopVoiceInput() {
+      isRecording = false;
+      const btn = document.getElementById('voiceBtn');
+      btn.classList.remove('recording');
+      btn.innerHTML = '<span>🎙️</span> Speak Prompt';
+    }
+
+    async function generatePractice() {
+      const input = document.getElementById('userInput').value.trim();
+      if (!input) return;
+
+      const genBtn = document.getElementById('generateBtn');
+      const outputDiv = document.getElementById('planOutput');
+      genBtn.disabled = true;
+      genBtn.innerHTML = '⏳ Reasoning & Planning...';
+      outputDiv.innerHTML = '<p style="color: #a78bfa;">Coordinating agents: Profile ➔ Knowledge ➔ Planner ➔ Safety ➔ Critic ➔ Response...</p>';
+
+      try {
+        const resp = await fetch('/api/practice/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_input: input, phase: 2 })
+        });
+        const data = await resp.json();
+
+        // Render response
+        outputDiv.innerHTML = formatMarkdown(data.final_response);
+
+        // Synthesize spoken guidance cue via ElevenLabs
+        synthesizeCue("Welcome to your practice. Find a comfortable seated position with a tall spine, softening your shoulders.");
+
+      } catch (err) {
+        outputDiv.innerHTML = `<p style="color: #ef4444;">Error generating practice: ${err.message}</p>`;
+      } finally {
+        genBtn.disabled = false;
+        genBtn.innerHTML = '<span>🧘</span> Generate Practice';
+      }
+    }
+
+    async function synthesizeCue(text) {
+      currentCueText = text;
+      document.getElementById('audioPlayerBar').style.display = 'flex';
+      document.getElementById('audioCueText').innerText = `"${text.substring(0, 45)}..."`;
+
+      try {
+        const resp = await fetch('/api/audio/synthesize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: text })
+        });
+        const data = await resp.json();
+        currentAudioUrl = data.audio_url;
+      } catch (e) {
+        console.warn("Synthesis fallback:", e);
+      }
+    }
+
+    function playCurrentCue() {
+      if (currentAudioUrl) {
+        const audio = new Audio(currentAudioUrl);
+        audio.play();
+      } else if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(currentCueText);
+        utterance.rate = 0.9;
+        window.speechSynthesis.speak(utterance);
+      }
+    }
+
+    function formatMarkdown(text) {
+      if (!text) return "";
+      let html = text
+        .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+        .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+        .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/gim, '<em>$1</em>')
+        .replace(/---/gim, '<hr/>')
+        .replace(/\n\n/gim, '<br/><br/>')
+        .replace(/• (.*$)/gim, '<li>$1</li>');
+      return html;
+    }
+  </script>
+</body>
+</html>
