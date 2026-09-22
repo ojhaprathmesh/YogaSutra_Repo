@@ -25,6 +25,11 @@ import os
 from google.adk.agents import LlmAgent
 
 from app.tools.duration import calculate_practice_duration
+from app.tools.planning import evaluate_candidate_plan_tool, generate_plan_candidates_tool
+from app.agents.planner.tot import (
+    generate_plan_candidates,
+    select_best_candidate,
+)
 
 _MODEL = os.environ.get("YOGASUTRA_MODEL", "gemini-3.5-flash-lite")
 
@@ -43,8 +48,9 @@ IMPORTANT RULES:
 3. Reference specific chunk_ids from the retrieved evidence to ground each pose.
 4. Match the user's experience level — beginners need simpler poses with clear instructions.
 5. You may call `calculate_practice_duration` to verify your sequence totals correctly.
-6. TARGET ALL USER CONCERNS: If the user mentions multiple physical conditions (e.g. both "rounded shoulders" AND "flat feet"), you MUST explicitly include exercises or clear alignment cues for EACH concern (e.g. chest openers for rounded shoulders, and foot arch activation / Pada Bandha / ankle mobility for flat feet). Do not omit any stated condition.
-7. REFLECTION / REVISION: If 'critique' or 'validation_results' is present in session state, you MUST address all critique points: replace any contraindicated poses with safe alternatives, adjust timings as instructed, and fix any violations.
+6. You may explore candidate options using `generate_plan_candidates_tool` and evaluate their biomechanical and safety score with `evaluate_candidate_plan_tool`.
+7. TARGET ALL USER CONCERNS: If the user mentions multiple physical conditions (e.g. both "rounded shoulders" AND "flat feet"), you MUST explicitly include exercises or clear alignment cues for EACH concern (e.g. chest openers for rounded shoulders, and foot arch activation / Pada Bandha / ankle mobility for flat feet). Do not omit any stated condition.
+8. REFLECTION / REVISION: If 'critique' or 'validation_results' is present in session state, you MUST address all critique points: replace any contraindicated poses with safe alternatives, adjust timings as instructed, and fix any violations.
 
 Return ONLY a single JSON object with exactly these keys:
 {
@@ -77,6 +83,26 @@ planner_agent = LlmAgent(
         "user's experience level, available time, and goal."
     ),
     instruction=PLANNER_INSTRUCTION,
-    tools=[calculate_practice_duration],
+    tools=[
+        calculate_practice_duration,
+        generate_plan_candidates_tool,
+        evaluate_candidate_plan_tool,
+    ],
     output_key="candidate_plan",
 )
+
+
+def execute_tot_planning(
+    profile: Any,
+    evidence: list[Any],
+    base_plan: Any | None = None,
+) -> tuple[Any, list[Any], list[dict[str, Any]], int]:
+    """
+    Executes programmatic Tree-of-Thoughts exploration across distinct sequence strategies.
+
+    Returns:
+        (best_plan, all_candidates, all_utility_reports, best_candidate_index)
+    """
+    candidates = generate_plan_candidates(base_plan=base_plan, profile=profile, evidence=evidence)
+    best_plan, evaluations, best_idx = select_best_candidate(candidates, profile, evidence)
+    return best_plan, candidates, evaluations, best_idx

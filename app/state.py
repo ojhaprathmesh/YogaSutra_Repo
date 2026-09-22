@@ -151,6 +151,12 @@ class YogaSessionState(BaseModel):
     critique: str | None = None
     revision_count: int = 0
 
+    # Phase 3A: Tree-of-Thoughts exploration & Event-Driven fields
+    candidate_plans: list[PracticePlan] = Field(default_factory=list)
+    candidate_utilities: list[dict[str, Any]] = Field(default_factory=list)
+    selected_candidate_index: int = 0
+    event_journal: list[dict[str, Any]] = Field(default_factory=list)
+
     # Final
     final_response: str | None = None
 

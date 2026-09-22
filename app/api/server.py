@@ -182,6 +182,143 @@ def get_mcp_tools() -> list[dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
+# Phase 3A: Event Bus, Longitudinal Memory, and ToT Planning Endpoints
+# ---------------------------------------------------------------------------
+
+from app.memory.longitudinal import get_longitudinal_store
+from app.tools.planning import evaluate_candidate_plan_tool, generate_plan_candidates_tool
+from app.workflows.event_driven import (
+    BaseEvent,
+    FeedbackReceivedEvent,
+    PostureDeviationEvent,
+    SafetyEscalationEvent,
+    SessionCompletedEvent,
+    get_event_bus,
+)
+
+
+class EventPublishRequest(BaseModel):
+    event_type: str
+    user_id: str = "P01"
+    session_id: str = ""
+    payload: dict[str, Any] = {}
+
+
+class EvaluatePlanRequest(BaseModel):
+    sequence: list[dict[str, Any]]
+    available_duration_minutes: int = 20
+    constraints: list[str] = []
+
+
+class CandidateGenerationRequest(BaseModel):
+    goal: str = "relaxation"
+    duration_minutes: int = 20
+    intensity: str = "gentle"
+    constraints: list[str] = []
+
+
+@app.get("/api/events/history")
+def get_event_history(event_type: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+    """Retrieve recent events from the in-memory Event Bus journal."""
+    bus = get_event_bus()
+    events = bus.get_history(event_type=event_type, limit=limit)
+    return [e.model_dump() for e in events]
+
+
+@app.post("/api/events/publish")
+def publish_event(req: EventPublishRequest) -> dict[str, Any]:
+    """Publish an event to the YogaSutra Event Bus."""
+    bus = get_event_bus()
+    evt: BaseEvent
+
+    if req.event_type == "FeedbackReceived":
+        evt = FeedbackReceivedEvent(
+            session_id=req.session_id,
+            user_id=req.user_id,
+            difficulty_rating=req.payload.get("difficulty_rating", 3),
+            fatigue_level=req.payload.get("fatigue_level", "normal"),
+            comments=req.payload.get("comments", ""),
+            pose_ratings=req.payload.get("pose_ratings", {}),
+        )
+    elif req.event_type == "SafetyEscalation":
+        evt = SafetyEscalationEvent(
+            session_id=req.session_id,
+            user_id=req.user_id,
+            severity=req.payload.get("severity", "medium"),
+            trigger_condition=req.payload.get("trigger_condition", "Reported pain"),
+            action_required=req.payload.get("action_required", "halt_practice"),
+            recommended_alternatives=req.payload.get("recommended_alternatives", []),
+        )
+    elif req.event_type == "PostureDeviation":
+        evt = PostureDeviationEvent(
+            session_id=req.session_id,
+            user_id=req.user_id,
+            pose_name=req.payload.get("pose_name", "Unknown Pose"),
+            joint_name=req.payload.get("joint_name", "knee"),
+            measured_angle=float(req.payload.get("measured_angle", 0.0)),
+            target_angle_range=req.payload.get("target_angle_range", [85.0, 95.0]),
+            deviation_deg=float(req.payload.get("deviation_deg", 0.0)),
+            severity=req.payload.get("severity", "moderate"),
+            correction_cue=req.payload.get("correction_cue", "Adjust alignment"),
+        )
+    elif req.event_type == "SessionCompleted":
+        evt = SessionCompletedEvent(
+            session_id=req.session_id,
+            user_id=req.user_id,
+            duration_minutes=int(req.payload.get("duration_minutes", 20)),
+            completed_poses=req.payload.get("completed_poses", []),
+            plan_goal=req.payload.get("plan_goal", "Practice"),
+        )
+    else:
+        evt = BaseEvent(
+            event_type=req.event_type,
+            session_id=req.session_id,
+            payload=req.payload,
+        )
+
+    results = bus.publish_sync(evt)
+    return {
+        "status": "published",
+        "event_id": evt.event_id,
+        "event_type": evt.event_type,
+        "handled_results_count": len(results),
+    }
+
+
+@app.get("/api/memory/trajectory/{user_id}")
+def get_user_trajectory_endpoint(user_id: str) -> dict[str, Any]:
+    """Fetch longitudinal progress profile and adaptive difficulty metrics."""
+    store = get_longitudinal_store()
+    trajectory = store.get_trajectory(user_id)
+    adjustments = store.get_adaptive_profile_adjustments(user_id)
+    return {
+        "trajectory": trajectory.model_dump(),
+        "adaptive_adjustments": adjustments,
+    }
+
+
+@app.post("/api/planning/evaluate")
+def evaluate_plan_endpoint(req: EvaluatePlanRequest) -> dict[str, Any]:
+    """Evaluate candidate sequence using the ToT multi-objective utility scorer."""
+    return evaluate_candidate_plan_tool(
+        sequence=req.sequence,
+        available_duration_minutes=req.available_duration_minutes,
+        constraints=req.constraints,
+    )
+
+
+@app.post("/api/planning/candidates")
+def generate_candidates_endpoint(req: CandidateGenerationRequest) -> list[dict[str, Any]]:
+    """Generate multiple sequence candidate branches for ToT exploration."""
+    return generate_plan_candidates_tool(
+        goal=req.goal,
+        duration_minutes=req.duration_minutes,
+        intensity=req.intensity,
+        constraints=req.constraints,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Static Studio UI
 # ---------------------------------------------------------------------------
 

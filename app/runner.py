@@ -42,6 +42,11 @@ from google.genai import types as genai_types
 
 from app.agents.root.agent import phase1_root_agent, phase2_root_agent
 from app.tracing.trace import ExecutionTrace
+from app.workflows.event_driven import (
+    SafetyEscalationEvent,
+    SessionCompletedEvent,
+    get_event_bus,
+)
 
 # Load .env if present
 load_dotenv()
@@ -312,10 +317,42 @@ def run_yogasutra(
 
     # Save trace to disk
     trace_path: Path | None = None
+    # EventBus reactive publication (Phase 3A)
     try:
-        trace_path = trace.save()
-    except Exception:  # noqa: BLE001
-        pass  # Non-fatal — trace saving failure doesn't break the run
+        bus = get_event_bus()
+        plan_obj = session_state.get("candidate_plan")
+        completed_poses: list[str] = []
+        plan_goal = "Yoga Practice"
+        dur_mins = 20
+
+        if isinstance(plan_obj, dict):
+            plan_goal = plan_obj.get("goal", plan_goal)
+            dur_mins = int(plan_obj.get("duration_minutes", dur_mins))
+            completed_poses = [p.get("name", "") for p in plan_obj.get("sequence", []) if isinstance(p, dict)]
+
+        bus.publish_sync(
+            SessionCompletedEvent(
+                session_id=session_id,
+                user_id=persona_id,
+                duration_minutes=dur_mins,
+                completed_poses=completed_poses,
+                plan_goal=plan_goal,
+            )
+        )
+
+        # Check for safety escalation
+        if trace.validation_results and not trace.validation_results.get("is_safe", True):
+            bus.publish_sync(
+                SafetyEscalationEvent(
+                    session_id=session_id,
+                    user_id=persona_id,
+                    severity="critical" if trace.validation_results.get("critical_contraindications") else "medium",
+                    trigger_condition=str(trace.validation_results.get("violations", ["Safety contraindication detected"])),
+                    action_required="halt_practice" if trace.validation_results.get("critical_contraindications") else "modify_pose",
+                )
+            )
+    except Exception as exc:  # noqa: BLE001
+        logging.getLogger("yogasutra.runner").debug("Non-fatal event publication notice: %s", exc)
 
     return YogaSutraResult(
         run_id=run_id,

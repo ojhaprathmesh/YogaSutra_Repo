@@ -2182,32 +2182,51 @@ collection of API integrations.
 -   [x] At least three model providers integrated
 -   [x] Initial latency benchmark available
 
-## Phase 3
+## Phase 3A — Advanced Agent Intelligence & Event-Driven Architecture
 
--   [ ] 40+ evaluation runs completed (including speech and live pose test scenarios)
+-   [x] Tree-of-Thoughts (ToT) multi-candidate sequence exploration operational in PlannerAgent
+-   [x] Weighted utility function candidate scoring operational (duration, safety, transition, grounding)
+-   [x] Asynchronous Pub/Sub Event Bus (`app/workflows/event_driven.py`) operational
+-   [x] Event schemas defined and typed (`SessionCompletedEvent`, `FeedbackReceivedEvent`, `SafetyEscalationEvent`, `PostureDeviationEvent`)
+-   [x] Advanced longitudinal memory (`app/memory/longitudinal.py`) operational with multi-session progression tracking
+-   [x] Automated unit tests for ToT planning and Event Bus passing
+
+## Phase 3B — Modular Real-Time Computer Vision Posture Engine
+
+-   [ ] Video frame ingestion worker via OpenCV operational (`app/vision/detector.py`)
+-   [ ] MediaPipe 3D Pose estimation (33 skeletal landmarks) integrated
+-   [ ] Pure-Python deterministic biomechanical joint calculator operational (<10ms latency)
+-   [ ] Knee flexion, spinal alignment, and shoulder/hip symmetry angle verification
+-   [ ] Pose Understanding & Correction Agent (`app/agents/pose/agent.py`) operational
+-   [ ] Closed-loop corrective cues dispatched to SpeechAgent via `PostureDeviationEvent`
+-   [ ] Unit tests for 3D biomechanics calculations and PoseAgent passing
+
+## Phase 3C — Fullstack Live Practice Studio UI & Observability Dashboard
+
+-   [ ] HTML5 / WebRTC Video Canvas with real-time 33-point skeletal wireframe overlay
+-   [ ] Live visual HUD with green/yellow/red joint angle indicator rings
+-   [ ] Synchronous voice audio player for ElevenLabs / WebSpeech corrective cues
+-   [ ] MAS Observability & Trace Analytics Dashboard (`app/ui/dashboard.py`) operational
+-   [ ] Per-agent latency waterfalls, token usage by provider, and communication pattern visualizer
+-   [ ] Real-time CV FPS counter and speech synthesis turnaround monitor
+
+## Phase 4 — Scientific Evaluation & Benchmark Experiments (40+ Runs)
+
+-   [ ] 40+ diverse evaluation runs executed across personas P01–P05 and edge cases
+-   [ ] 4-way MAS architecture comparison benchmark (Sequential vs Hierarchical vs Broadcast vs Blackboard)
+-   [ ] Multi-model provider comparison (Google Gemini vs Ollama Cloud 120B vs NVIDIA NIM)
 -   [ ] Human-in-the-Loop (HITL) domain expert panel evaluation completed across all 40+ runs
--   [ ] Inter-rater reliability (Cohen's / Fleiss' Kappa) measured on human expert rubric scores
--   [ ] Persona-linked evaluation completed
--   [ ] Architecture comparison completed
--   [ ] Agent bottleneck analysis completed (including speech and CV latency)
--   [ ] Multi-model comparison completed
--   [ ] Dynamic model routing operational
--   [ ] Model capability registry operational
--   [ ] Model cascading operational
--   [ ] Reflection experiment completed
--   [ ] Advanced planning evaluated
--   [ ] Event-driven memory operational
--   [ ] Modular real-time computer vision posture correction plug-in operational (OpenCV + MediaPipe/YOLO)
--   [ ] Live Practice Studio UI operational (video canvas, skeleton HUD, spoken cues)
--   [ ] Docker Compose production-like runtime operational
--   [ ] Docker-based caching/concurrency/resource controls evaluated
--   [ ] End-to-end latency benchmark completed
--   [ ] p95 latency measured against 30-second ceiling
--   [ ] Observability dashboard operational
--   [ ] Deployment completed
--   [ ] Final report completed
--   [ ] Final presentation completed
--   [ ] Viva preparation completed
+-   [ ] Inter-rater reliability (Cohen's / Fleiss' Kappa) measured on expert rubric scores
+-   [ ] CriticAgent reflection loop ablation study completed
+-   [ ] End-to-end latency benchmark with p95 measured against 30-second ceiling
+
+## Phase 5 — Production Deployment, Final Report & Defense Deliverables
+
+-   [ ] Multi-container Docker Compose production stack operational (`api`, `frontend`, `mcp-server`, `eval-runner`)
+-   [ ] Container resource limits, caching, and healthchecks configured
+-   [ ] Comprehensive IEEE-style academic final report completed (`docs/FINAL_REPORT.md`)
+-   [ ] Presentation slide deck and live demo script completed
+-   [ ] Viva defense preparation guide with architectural rationale completed
 
 # 32. Observability Architecture
 
@@ -2554,72 +2573,101 @@ At least 40 runs; target 44+.
 
 ------------------------------------------------------------------------
 
-# Phase 3 --- Final Agentic System & Modular CV Posture Extension
+# Phase 3A --- Advanced Agent Intelligence & Event-Driven Architecture
 
-### Target
+### Dependency Order
+**Prerequisites**: Phase 2 (Completed ✅)  
+**Rationale**: Before real-time video posture correction or complex UI dashboards can be built, the system requires the underlying asynchronous event backbone (`event_driven.py`), event schemas, and search-based planning reasoning (ToT + utility ranking).
 
-Late October → final evaluation.
+### Deliverables
+1. **Tree-of-Thoughts (ToT) Multi-Candidate Sequence Exploration**:
+   - `PlannerAgent` explores multiple candidate sequence paths (branching based on user energy, prop availability, and intensity).
+   - Candidate utility function scoring:
+     $$\text{Utility} = w_1 \cdot \text{DurationCompliance} + w_2 \cdot \text{SafetyScore} + w_3 \cdot \text{TransitionSmoothness} + w_4 \cdot \text{EvidenceGrounding}$$
+2. **Asynchronous Event-Driven Bus (`app/workflows/event_driven.py`)**:
+   - Pub/Sub event dispatcher operating over the shared blackboard.
+   - Core typed events: `SessionCompletedEvent`, `FeedbackReceivedEvent`, `SafetyEscalationEvent`, `PostureDeviationEvent`.
+3. **Advanced Longitudinal Memory (`app/memory/longitudinal.py`)**:
+   - Multi-session progression tracking (stamina curve, pose hold duration history).
+   - Adaptive difficulty scaling and preference persistence.
 
-### Goal
+------------------------------------------------------------------------
 
-Turn the core prototype into the final demonstrable system, validate
-the agentic design experimentally, and activate the **modular real-time video posture correction plug-in**.
+# Phase 3B --- Modular Real-Time Computer Vision Posture Engine
 
-### Add
+### Dependency Order
+**Prerequisites**: Phase 3A (Event-Driven Bus & `PostureDeviationEvent` schema)  
+**Rationale**: Posture analysis runs as a decoupled high-speed worker that emits deviation events into the Phase 3A Event Bus. Building the CV pipeline before the event layer would result in tight coupling or blocking the main agent loop.
 
-#### Modular Real-Time Computer Vision Posture Module (CV Extension Plug-in)
+### Deliverables
+1. **Video Ingestion & 3D Pose Extraction (`app/vision/detector.py`)**:
+   - OpenCV video frame ingestion worker (webcam / video stream).
+   - MediaPipe Pose extracting 33 3D skeletal landmarks.
+2. **Deterministic Biomechanical Joint Calculator (`app/vision/biomechanics.py`)**:
+   - Fast pure-Python trigonometric 3D angle calculations (<10ms per frame):
+     - Knee flexion angle (e.g. 90° check in Virabhadrasana II).
+     - Spinal verticality and lumbar hyperextension.
+     - Shoulder-hip horizontal level and hip squareness.
+3. **Pose Understanding & Correction Agent (`app/agents/pose/agent.py`)**:
+   - Compares live joint angles against classical RAG asana criteria from `corpus.json`.
+   - Generates high-priority corrective voice cues dispatched to `SpeechAgent` via `PostureDeviationEvent`.
 
--   **Video Ingestion**: Local webcam / video stream worker via OpenCV;
--   **Pose Extraction**: MediaPipe Pose (33 3D skeletal landmarks) and optional YOLOv8-pose;
--   **Biomechanical Angle Calculator**: Fast, deterministic joint angle computation (knee flexion, hip-shoulder symmetry, spinal alignment);
--   **Pose Understanding & Correction Agent**: Event-driven agent comparing live joint angles with RAG asana criteria;
--   **Real-Time Closed Feedback Loop**: Dispatches high-priority spoken voice guidance via Speech Agent and visual wireframe HUD overlay;
--   **Decoupled Architecture**: High-speed vision worker communicates asynchronously with ADK session state via events, ensuring zero lag on main agent planning.
+------------------------------------------------------------------------
 
-#### Advanced Planning
+# Phase 3C --- Fullstack Live Practice Studio UI & Observability Dashboard
 
--   ToT-style candidate exploration;
--   utility-based candidate evaluation.
+### Dependency Order
+**Prerequisites**: Phase 3A (Event Bus) & Phase 3B (CV Engine & Joint Landmarks)  
+**Rationale**: The interactive UI requires both the live skeletal landmark stream from Phase 3B to draw the wireframe canvas and the event bus from Phase 3A to display traces and real-time audio playback.
 
-#### Event-driven Behavior
+### Deliverables
+1. **Live Practice Studio Canvas**:
+   - HTML5 / WebRTC Video Canvas with real-time 33-point skeletal wireframe overlay.
+   - Interactive visual HUD: Green/Yellow/Red joint angle indicator rings.
+   - Synchronous audio player for ElevenLabs / WebSpeech corrective cues.
+2. **MAS Observability & Trace Analytics Dashboard (`app/ui/dashboard.py`)**:
+   - Visual execution trace breakdown: per-agent latency waterfalls, token usage by provider.
+   - Multi-agent communication pattern visualizer (Sequential vs. Hierarchical vs. Broadcast).
+   - Real-time CV FPS counter and speech synthesis turnaround latency monitor.
 
--   session-completed event;
--   feedback event;
--   memory-update workflow;
--   safety escalation events;
--   real-time posture deviation events (`PostureDeviationEvent`).
+------------------------------------------------------------------------
 
-#### Advanced Memory
+# Phase 4 --- Scientific Evaluation & Benchmark Experiments (40+ Runs)
 
--   preference extraction;
--   historical feedback;
--   posture biomechanics profile & progress history;
--   personalization.
+### Dependency Order
+**Prerequisites**: Phase 3C (Complete operational system across text, speech, vision, and UI)  
+**Rationale**: Empirical benchmarking and expert evaluations require a fully integrated, operational system. Testing an incomplete system produces invalid evaluation data.
 
-#### Observability
+### Deliverables
+1. **40+ Diverse Evaluation Runs (`data/evaluation/runs/`)**:
+   - Executed across synthetic personas P01–P05 and edge cases (injury constraints, morning/evening, time constraints, out-of-corpus queries).
+2. **Four-Way Architectural Comparison Benchmark**:
+   - Compare Sequential vs. Hierarchical vs. Broadcast vs. Blackboard on identical test requests.
+   - Measure task completion latency, token overhead, and revision counts.
+3. **Multi-Model Provider Comparison**:
+   - Compare Google Gemini vs. Ollama Cloud (GPT-OSS 120B) vs. NVIDIA NIM across reasoning quality and response latency.
+4. **Human-in-the-Loop (HITL) Domain Expert Evaluation**:
+   - Certified yoga instructor panel grading plans across 4 standardized dimensions: Biomechanical Safety, Classical Authenticity, Sequencing Flow, and Tone.
+   - Inter-rater reliability measurement using Cohen's and Fleiss' Kappa.
+5. **CriticAgent Reflection Loop Ablation Study**:
+   - Quantify safety violation reduction and grounding improvement with reflection loop vs. single-pass baseline.
 
--   trace dashboard;
--   MAS-level analysis;
--   agent-level analysis;
--   latency bottleneck visualization (including CV frame rate and audio cue latency).
+------------------------------------------------------------------------
 
-#### Evaluation
+# Phase 5 --- Production Packaging, Final Report & Defense Deliverables
 
--   40+ completed runs (including multimodal voice and posture scenarios);
--   architecture comparison;
--   model comparison;
--   grounding analysis;
--   reflection analysis;
--   safety analysis;
--   posture correction precision & response latency analysis.
+### Dependency Order
+**Prerequisites**: Phase 4 (Empirical evaluation results and metrics finalized)  
+**Rationale**: Academic reports, defense slide decks, and final container configurations must report the exact empirical data and verified metrics gathered during Phase 4.
 
-#### Deployment
-
--   production-like deployment;
--   frontend (Next.js with Live Practice Studio canvas & voice visualizer);
--   backend/ADK service;
--   observability;
--   reproducible configuration.
+### Deliverables
+1. **Containerized Production Deployment (`docker-compose.yml`)**:
+   - Multi-container stack: `api` (FastAPI backend), `frontend` (Live Studio UI), `mcp-server`, and `eval-runner`.
+   - Container resource limits, healthchecks, and caching controls.
+2. **Comprehensive Final Technical Project Report (`docs/FINAL_REPORT.md`)**:
+   - IEEE / Academic MAS standard: Problem Statement, PEAS, Multi-Agent Architecture, RAG Grounding, Safety Proofs, Empirical Evaluation Results, and Architectural Trade-off Analysis.
+3. **Final Presentation & Viva Defense Package**:
+   - Slide deck outline, architecture demo script, and comprehensive Q&A preparation guide addressing multi-agent design decisions.
 
 ------------------------------------------------------------------------
 
@@ -3121,25 +3169,50 @@ medical diagnosis or treatment claims.
 -   [x] Working frontend with speech interaction
 -   [x] Initial evaluation suite
 
-## Phase 3
+## Phase 3A — Advanced Agent Intelligence & Event-Driven Architecture
 
--   [ ] 40+ evaluation runs completed (including speech and live pose test scenarios)
+-   [x] Tree-of-Thoughts (ToT) multi-candidate sequence exploration operational in PlannerAgent
+-   [x] Weighted utility function candidate scoring operational
+-   [x] Asynchronous Pub/Sub Event Bus (`app/workflows/event_driven.py`) operational
+-   [x] Typed event schemas (`SessionCompletedEvent`, `FeedbackReceivedEvent`, `SafetyEscalationEvent`, `PostureDeviationEvent`)
+-   [x] Advanced longitudinal memory (`app/memory/longitudinal.py`) operational
+-   [x] Unit tests for ToT planning and Event Bus passing
+
+## Phase 3B — Modular Real-Time Computer Vision Posture Engine
+
+-   [ ] Video frame ingestion worker via OpenCV operational (`app/vision/detector.py`)
+-   [ ] MediaPipe 3D Pose estimation (33 skeletal landmarks) integrated
+-   [ ] Pure-Python deterministic biomechanical joint calculator operational (<10ms latency)
+-   [ ] Pose Understanding & Correction Agent (`app/agents/pose/agent.py`) operational
+-   [ ] Closed-loop corrective cues dispatched to SpeechAgent via `PostureDeviationEvent`
+-   [ ] Unit tests for 3D biomechanics calculations and PoseAgent passing
+
+## Phase 3C — Fullstack Live Practice Studio UI & Observability Dashboard
+
+-   [ ] HTML5 / WebRTC Video Canvas with real-time 33-point skeletal wireframe overlay
+-   [ ] Live visual HUD with green/yellow/red joint angle indicator rings
+-   [ ] Synchronous voice audio player for ElevenLabs / WebSpeech corrective cues
+-   [ ] MAS Observability & Trace Analytics Dashboard (`app/ui/dashboard.py`) operational
+-   [ ] Per-agent latency waterfalls, token usage by provider, and communication visualizer
+-   [ ] Real-time CV FPS counter and speech synthesis turnaround monitor
+
+## Phase 4 — Scientific Evaluation & Benchmark Experiments (40+ Runs)
+
+-   [ ] 40+ diverse evaluation runs executed across personas P01–P05 and edge cases
+-   [ ] 4-way MAS architecture comparison benchmark (Sequential vs Hierarchical vs Broadcast vs Blackboard)
+-   [ ] Multi-model provider comparison (Google Gemini vs Ollama Cloud 120B vs NVIDIA NIM)
 -   [ ] Human-in-the-Loop (HITL) domain expert panel evaluation completed across all 40+ runs
--   [ ] Inter-rater reliability (Cohen's / Fleiss' Kappa) measured on human expert rubric scores
--   [ ] Persona-linked evaluation completed
--   [ ] Architecture comparison completed
--   [ ] Agent bottleneck analysis completed (including speech and CV turnaround)
--   [ ] Multi-model comparison completed
--   [ ] Reflection experiment completed
--   [ ] Advanced planning evaluated
--   [ ] Event-driven memory operational
--   [ ] Modular real-time computer vision posture correction plug-in operational (OpenCV + MediaPipe/YOLO)
--   [ ] Live Practice Studio UI operational (video canvas, skeleton HUD, spoken cues)
--   [ ] Observability dashboard operational
--   [ ] Deployment completed
--   [ ] Final report completed
--   [ ] Final presentation completed
--   [ ] Viva preparation completed
+-   [ ] Inter-rater reliability (Cohen's / Fleiss' Kappa) measured on expert rubric scores
+-   [ ] CriticAgent reflection loop ablation study completed
+-   [ ] End-to-end latency benchmark with p95 measured against 30-second ceiling
+
+## Phase 5 — Production Deployment, Final Report & Defense Deliverables
+
+-   [ ] Multi-container Docker Compose production stack operational (`api`, `frontend`, `mcp-server`, `eval-runner`)
+-   [ ] Container resource limits, caching, and healthchecks configured
+-   [ ] Comprehensive IEEE-style academic final report completed (`docs/FINAL_REPORT.md`)
+-   [ ] Presentation slide deck and live demo script completed
+-   [ ] Viva defense preparation guide with architectural rationale completed
 
 ------------------------------------------------------------------------
 
