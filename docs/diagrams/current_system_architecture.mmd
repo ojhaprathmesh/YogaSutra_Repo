@@ -1,0 +1,96 @@
+flowchart TB
+    subgraph UI_Layer["User Interaction & Interfaces (Current State)"]
+        U["User"]
+        MIC["Microphone / Speech Input\n(Web Speech API)"]
+        SPEAKER["Audio Output / Spoken Cues\n(HTML5 Audio / ElevenLabs Stream)"]
+        SCREEN["Web UI Studio (FastAPI Static)\n+ Rich Terminal Live Graph"]
+
+        U -->|Voice Prompt| MIC
+        U -->|Text Prompt| SCREEN
+        SPEAKER -->|Voice Guidance| U
+        SCREEN -->|Visual Feedback, Plan & Trace| U
+    end
+
+    subgraph API_and_Audio["FastAPI Server & Audio Pipeline"]
+        API["FastAPI App (app/api/server.py)\nREST Endpoints & Static Server"]
+        STT["STT Adapter (app/audio/stt.py)\nWebSpeech / Base64 Payload"]
+        TTS["TTS Engine (app/audio/tts.py)\nElevenLabs Turbo v2.5 + WebSpeech Fallback"]
+        AUD_CACHE[("Audio Cache (data/audio_cache/*.mp3)")]
+
+        MIC --> STT
+        STT --> API
+        SCREEN <-->|HTTP / JSON| API
+        TTS <--> AUD_CACHE
+        API --> TTS
+        TTS --> SPEAKER
+    end
+
+    subgraph Model_Gateway_Layer["Model Gateway & Resilience (app/models/)"]
+        GW["Model Gateway (gateway.py)"]
+        ROUTER["Model Router (router.py)"]
+        RL["Token Bucket Rate Limiter (rate_limiter.py)"]
+        M_CACHE["Response Cache (cache.py)"]
+
+        P_GEMINI["Google Gemini 3.5/3.1 Flash-Lite"]
+        P_OLLAMA["Ollama Cloud (120b, 31b, 30b)"]
+        P_NVIDIA["NVIDIA NIM (Llama 3.2 11b)"]
+
+        GW --> ROUTER
+        GW --> RL
+        GW --> M_CACHE
+        ROUTER --> P_GEMINI
+        ROUTER --> P_OLLAMA
+        ROUTER --> P_NVIDIA
+    end
+
+    subgraph Multi_Agent_Core["YogaSutra Multi-Agent Core (Google ADK & Runner)"]
+        RUNNER["InMemoryRunner / Runner (app/runner.py)"]
+        RM["Root Manager Agent / ResponseAgent\n(app/agents/root/agent.py)"]
+        PA["Profile Agent\n(app/agents/profile/agent.py)"]
+        KA["Knowledge / RAG Agent\n(app/agents/knowledge/agent.py)"]
+        PP["Practice Planner Agent + ToT Explorer\n(app/agents/planner/agent.py & tot.py)"]
+        SV["Safety & Constraint Agent\n(app/agents/safety/agent.py)"]
+        CR["Critic / Reflection Agent\n(app/agents/critic/agent.py)"]
+        SA["Speech / Audio Agent\n(app/agents/speech/agent.py)"]
+
+        SS[("Shared Session State / Blackboard\n(app/state.py: YogaSessionState)")]
+        BUS{{"Pub/Sub Event Bus (app/workflows/event_driven.py)\n[SessionCompleted, FeedbackReceived, SafetyEscalation, PostureDeviation]"}}
+
+        RUNNER --> RM
+        RM <--> SS
+        PA <--> SS
+        KA <--> SS
+        PP <--> SS
+        SV <--> SS
+        CR <--> SS
+        SA <--> SS
+
+        CR -->|PASS -> Finalize Plan| RM
+        CR -->|REVISE -> Iteration Loop| PP
+    end
+
+    subgraph Storage_and_Tools["Storage, Memory & Tool Subsystem"]
+        KB[("In-Memory 289-Chunk Yoga Corpus\n(data/knowledge/corpus.json)")]
+        MCP_SRV["MCP Server & Client\n(app/mcp/server.py & client.py)"]
+        RULES["Safety Rules & Contraindication Audit\n(app/tools/safety.py)"]
+        PLAN_TOOLS["Planning & Duration Tools\n(app/tools/planning.py & duration.py)"]
+        AUD_TOOLS["Audio Tools\n(app/tools/audio_tools.py)"]
+        MEM_USER[("Persistent User Store\n(app/memory/user_store.py)")]
+        MEM_LONG[("Longitudinal Trajectory Store\n(app/memory/longitudinal.py)")]
+        TRACES[("Execution Traces\n(data/traces/*.json)")]
+    end
+
+    %% Cross-layer links
+    API --> RUNNER
+    API --> BUS
+    API <--> GW
+    Multi_Agent_Core -.-> GW
+    KA --> KB
+    KA --> MCP_SRV
+    PP --> PLAN_TOOLS
+    SV --> RULES
+    SA --> AUD_TOOLS
+    PA <--> MEM_USER
+    PA <--> MEM_LONG
+    BUS -->|SessionCompleted / FeedbackReceived| MEM_LONG
+    Multi_Agent_Core -.->|Structured Trace Steps| TRACES
