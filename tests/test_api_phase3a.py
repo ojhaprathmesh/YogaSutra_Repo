@@ -16,7 +16,7 @@ def test_api_events_publish_and_history():
         "/api/events/publish",
         json={
             "event_type": "FeedbackReceived",
-            "user_id": "P01",
+            "user_id": "test_api_user",
             "session_id": "test_api_sess",
             "payload": {
                 "difficulty_rating": 4,
@@ -39,12 +39,12 @@ def test_api_events_publish_and_history():
 
 
 def test_api_memory_trajectory():
-    res = client.get("/api/memory/trajectory/P01")
+    res = client.get("/api/memory/trajectory/test_api_user")
     assert res.status_code == 200
     data = res.json()
     assert "trajectory" in data
     assert "adaptive_adjustments" in data
-    assert data["trajectory"]["user_id"] == "P01"
+    assert data["trajectory"]["user_id"] == "test_api_user"
 
 
 def test_api_planning_candidates():

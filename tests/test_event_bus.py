@@ -96,7 +96,7 @@ def test_event_bus_record_to_session_state():
     state = YogaSessionState()
 
     event = FeedbackReceivedEvent(
-        user_id="P02",
+        user_id="test_user_p02",
         difficulty_rating=5,
         fatigue_level="exhausted",
         comments="Too fast",
@@ -105,7 +105,7 @@ def test_event_bus_record_to_session_state():
 
     assert len(state.event_journal) == 1
     assert state.event_journal[0]["event_type"] == "FeedbackReceived"
-    assert state.event_journal[0]["user_id"] == "P02"
+    assert state.event_journal[0]["user_id"] == "test_user_p02"
 
 
 def test_global_event_bus_default_handlers():
@@ -113,7 +113,7 @@ def test_global_event_bus_default_handlers():
 
     # Safety escalation handler test
     safe_evt = SafetyEscalationEvent(
-        user_id="P03",
+        user_id="test_user_p03",
         severity="critical",
         trigger_condition="Acute sharp pain in shoulder",
         action_required="halt_practice",

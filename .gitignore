@@ -28,15 +28,27 @@ uv.lock
 *.swo
 .DS_Store
 
-# Testing
+# Testing & Generated Test Files
 .pytest_cache/
 .coverage
 htmlcov/
+**/test_*.json
+**/*_test.json
+data/**/test_*
+data/**/test_*/**
 
-# Data (keep structure, ignore generated files)
+# Data (keep directory structure via .gitkeep, ignore generated files)
 data/traces/*.json
 data/personas/*.json
-data/temp
+data/sessions/*.json
+data/memory/**/*.json
+data/audio_cache/*
+!data/traces/.gitkeep
+!data/personas/.gitkeep
+!data/sessions/.gitkeep
+!data/memory/longitudinal/.gitkeep
+!data/audio_cache/.gitkeep
+data/temp/
 
 # Logs
 *.log
