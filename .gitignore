@@ -43,6 +43,9 @@ data/personas/*.json
 data/sessions/*.json
 data/memory/**/*.json
 data/audio_cache/*
+data/models/*
+!data/models/.gitkeep
+*.task
 !data/traces/.gitkeep
 !data/personas/.gitkeep
 !data/sessions/.gitkeep

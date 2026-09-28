@@ -2274,15 +2274,15 @@ collection of API integrations.
 
 ## Phase 3B — Modular Real-Time Computer Vision Posture Engine
 
--   [ ] Video frame ingestion worker via OpenCV operational with 480p capture clamp and zero-lag bounded buffer (`app/vision/detector.py`)
--   [ ] MediaPipe 3D Pose Lite (`model_complexity=0`, `enable_segmentation=False`) integrated under <60MB RAM footprint
--   [ ] Zero-hallucination pure-Python deterministic 3D vector geometry calculator operational (<2ms latency, `app/vision/biomechanics.py`)
--   [ ] Knee flexion, elbow flexion, spinal verticality, and shoulder/hip symmetry angle verification
--   [ ] Classical asana reference criteria matrix established (`app/vision/criteria.py`)
--   [ ] Pose Understanding & Correction Agent (`app/agents/pose/agent.py`) operational with 1.5s temporal debounce
--   [ ] Closed-loop corrective cues dispatched to SpeechAgent via `PostureDeviationEvent`
--   [ ] Standalone interactive verification CLI runner (`scripts/run_pose_detector.py`) with telemetry HUD (FPS, latency, RAM)
--   [ ] Unit tests for 3D biomechanics calculations, zero-hallucination assertion, and PoseAgent passing
+-   [x] Video frame ingestion worker via OpenCV operational with 480p capture clamp and zero-lag bounded buffer (`app/vision/detector.py`)
+-   [x] MediaPipe 3D Pose Lite (`model_complexity=0`, `enable_segmentation=False`) integrated under <60MB RAM footprint
+-   [x] Zero-hallucination pure-Python deterministic 3D vector geometry calculator operational (<2ms latency, `app/vision/biomechanics.py`)
+-   [x] Knee flexion, elbow flexion, spinal verticality, and shoulder/hip symmetry angle verification
+-   [x] Classical asana reference criteria matrix established (`app/vision/criteria.py`)
+-   [x] Pose Understanding & Correction Agent (`app/agents/pose/agent.py`) operational with 1.5s temporal debounce
+-   [x] Closed-loop corrective cues dispatched to SpeechAgent via `PostureDeviationEvent`
+-   [x] Standalone interactive verification CLI runner (`scripts/run_pose_detector.py`) with telemetry HUD (FPS, latency, RAM)
+-   [x] Unit tests for 3D biomechanics calculations, zero-hallucination assertion, and PoseAgent passing
 
 ## Phase 3C — Fullstack Live Practice Studio UI & Observability Dashboard
 
@@ -3303,14 +3303,14 @@ medical diagnosis or treatment claims.
 
 ## Phase 3B — Modular Real-Time Computer Vision Posture Engine
 
--   [ ] Video frame ingestion worker via OpenCV operational with 480p capture clamp and zero-lag bounded buffer (`app/vision/detector.py`)
--   [ ] MediaPipe 3D Pose Lite (`model_complexity=0`, `enable_segmentation=False`) integrated under <60MB RAM footprint
--   [ ] Zero-hallucination pure-Python deterministic 3D vector geometry calculator operational (<2ms latency, `app/vision/biomechanics.py`)
--   [ ] Classical asana reference criteria matrix established (`app/vision/criteria.py`)
--   [ ] Pose Understanding & Correction Agent (`app/agents/pose/agent.py`) operational with 1.5s temporal debounce
--   [ ] Closed-loop corrective cues dispatched to SpeechAgent via `PostureDeviationEvent`
--   [ ] Standalone interactive verification CLI runner (`scripts/run_pose_detector.py`) with telemetry HUD (FPS, latency, RAM)
--   [ ] Unit tests for 3D biomechanics calculations, zero-hallucination assertion, and PoseAgent passing
+-   [x] Video frame ingestion worker via OpenCV operational with 480p capture clamp and zero-lag bounded buffer (`app/vision/detector.py`)
+-   [x] MediaPipe 3D Pose Lite (`model_complexity=0`, `enable_segmentation=False`) integrated under <60MB RAM footprint
+-   [x] Zero-hallucination pure-Python deterministic 3D vector geometry calculator operational (<2ms latency, `app/vision/biomechanics.py`)
+-   [x] Classical asana reference criteria matrix established (`app/vision/criteria.py`)
+-   [x] Pose Understanding & Correction Agent (`app/agents/pose/agent.py`) operational with 1.5s temporal debounce
+-   [x] Closed-loop corrective cues dispatched to SpeechAgent via `PostureDeviationEvent`
+-   [x] Standalone interactive verification CLI runner (`scripts/run_pose_detector.py`) with telemetry HUD (FPS, latency, RAM)
+-   [x] Unit tests for 3D biomechanics calculations, zero-hallucination assertion, and PoseAgent passing
 
 ## Phase 3C — Fullstack Live Practice Studio UI & Observability Dashboard
 
