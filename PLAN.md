@@ -204,17 +204,17 @@ The system uses specialized agents with clearly separated responsibilities, stru
   ----------------------- ----------------------- -----------------------
   **Root Manager Agent**  Understand request,     Hierarchical
                           select workflow,        orchestration, planning
-                          coordinate specialists  
+                          coordinate specialists
 
   **Profile Agent**       Extract user goals,     Perception, memory,
                           preferences,            structured extraction
-                          constraints and context 
+                          constraints and context
 
   **Knowledge/RAG Agent** Retrieve and ground     RAG, ReAct, tools
-                          information from the    
-                          curated knowledge base  
-                          (including asana        
-                          biomechanical rules)    
+                          information from the
+                          curated knowledge base
+                          (including asana
+                          biomechanical rules)
 
   **Practice Planner      Generate structured     Goal-based planning,
   Agent**                 practice plans          CoT-style planning
@@ -222,7 +222,7 @@ The system uses specialized agents with clearly separated responsibilities, stru
   **Safety & Constraint   Validate explicit       Guardrails, KRR,
   Agent**                 constraints, medical    deterministic
                           contraindications, and  validation
-                          project safety rules    
+                          project safety rules
 
   **Critic/Reflection     Evaluate the generated  Reflection,
   Agent**                 plan and request        self-critique,
@@ -231,15 +231,15 @@ The system uses specialized agents with clearly separated responsibilities, stru
   **Speech / Audio Agent** Ingest user voice       Audio perception, STT,
                           transcripts, manage     conversational pacing,
                           conversational pacing,  TTS actuation
-                          and synthesize spoken   
-                          cues & audio responses  
+                          and synthesize spoken
+                          cues & audio responses
 
   **Pose Understanding &  Analyze extracted       Computer vision,
   Correction Agent**      skeletal landmarks and  biomechanics,
   *(Modular CV Plug-in)*  joint angles, compare   event-driven corrective
                           with RAG asana criteria, feedback
-                          and formulate concise   
-                          real-time adjustments   
+                          and formulate concise
+                          real-time adjustments
   -----------------------------------------------------------------------
 
 The core architecture operates with 6 core text/planning agents + 1 Speech Agent, while the **Pose Understanding & Correction Agent** is engineered as a plug-and-play module that attaches via the shared blackboard and event bus.
@@ -256,27 +256,29 @@ config:
   layout: elk
 ---
 flowchart TB
-    subgraph UI_Layer["User Interaction & Multimodal Interface"]
+    subgraph UI_Layer["User Interaction & Multimodal Client (Next.js)"]
         U["User"]
         MIC["Microphone / Speech Input"]
         CAM["Webcam / Video Stream"]
         SPEAKER["Audio Output / Spoken Cues"]
-        SCREEN["Web UI / Visual Trace & HUD"]
+        SCREEN["Live Practice Canvas & Observability HUD"]
 
-        U -->|Voice| MIC
-        U -->|Text Prompt| SCREEN
-        U -->|Live Poses| CAM
-        SPEAKER -->|Voice Guidance| U
-        SCREEN -->|Visual Feedback & Trace| U
+        U -->|Voice Utterance| MIC
+        U -->|Text / Goal Prompt| SCREEN
+        U -->|Active Asana Practice| CAM
+        SPEAKER -->|Hands-Free Voice Guidance| U
+        SCREEN -->|Visual Skeleton & Biomechanical Feedback| U
     end
 
-    subgraph Audio_Vision_Pipeline["Multimodal I/O & Biomechanical Pipeline"]
+    subgraph Multimodal_Pipeline["Multimodal Perception & Biomechanics Engine"]
         MIC --> STT["STT Engine (Whisper / WebSpeech)"]
-        CAM --> CV["OpenCV + MediaPipe / YOLOv8-Pose"]
-        CV --> MATH["Biomechanical Joint Angle Engine"]
+        CAM --> CV["OpenCV Ingestion (480p Clamped, Queue maxsize=1)"]
+        CV --> MP["MediaPipe Pose Lite (33 3D Landmarks)"]
+        MP --> GEOM["Pure-Python 3D Vector Geometry Engine"]
+        GEOM -->|Skeleton Overlay & Angle HUD| SCREEN
     end
 
-    subgraph Multi_Agent_Core["YogaSutra Multi-Agent System (Google ADK)"]
+    subgraph Multi_Agent_Core["YogaSutra Multi-Agent Core (Google ADK)"]
         RM["Root Manager Agent"]
         PA["Profile Agent"]
         KA["Knowledge / RAG Agent"]
@@ -284,21 +286,34 @@ flowchart TB
         SV["Safety & Constraint Agent"]
         CR["Critic / Reflection Agent"]
         SA["Speech / Audio Agent"]
-        POA["Pose Understanding & Correction Agent\n(Modular CV Plug-in)"]
+        POA["Pose Understanding & Correction Agent"]
 
-        SS[("Shared Session State\n(Blackboard)")]
-        BUS{{"Event Bus / Reactive Loop"}}
+        SS[("ADK Session State\n(Shared Blackboard)")]
+        BUS{{"Reactive Event Bus"}}
     end
 
-    subgraph Storage_and_Tools["Knowledge & External Integration"]
+    subgraph Knowledge_and_Tools["Knowledge, Constraints & External Integration"]
         KB[("PostgreSQL + pgvector\n(Asanas & Biomechanics)")]
-        MCP["MCP Tool Server"]
-        RULES[("Safety & Contraindication Rules")]
-        MEM[("Persistent User Memory")]
+        MCP["YogaSutra MCP Server"]
+        RULES[("Safety Rules & Contraindications")]
+        MEM[("Persistent Long-Term Memory")]
     end
+
+    subgraph Observability_Layer["Observability, Telemetry & Evaluation"]
+        TRACE["Execution Traces (Agent & Tool Spans)"]
+        MET["Telemetry Metrics (Latency, WER, CV FPS, RAM)"]
+        EVAL["Scientific Evaluation Engine (40+ Persona Runs)"]
+        DASH["MAS Trace Analytics Dashboard"]
+    end
+
+    %% Multimodal Perception to Agents & Bus
     STT -->|Transcribed Text| RM
-    SCREEN -->|Text Request| RM
-    MATH -->|Keypoints & Angle Metrics| BUS
+    SCREEN -->|Goal & Session Configuration| RM
+    GEOM -->|PostureDeviationEvent| BUS
+    BUS -->|Real-Time Alignment Alerts| POA
+    BUS -->|VoiceCommandEvent| RM
+
+    %% Agent State & Blackboard Access
     RM <--> SS
     PA <--> SS
     KA <--> SS
@@ -307,18 +322,32 @@ flowchart TB
     CR <--> SS
     SA <--> SS
     POA <--> SS
-    BUS -->|PostureDeviationEvent| POA
-    BUS -->|VoiceCommandEvent| RM
-    POA -->|Corrective Cue| SA
-    SA -->|Audio Stream| SPEAKER
+
+    %% Planning, Reflection & Corrective Loops
+    POA -->|Immediate Corrective Cue| SA
+    CR -->|Pass: Approved Plan| SA
+    CR -->|Pass: Render Plan| SCREEN
+    CR -->|Revision Required| PP
+
+    %% Audio Dispatch
+    SA -->|Synthesized TTS Audio Stream| SPEAKER
+
+    %% Knowledge Retrieval & Tools
     KA --> KB
     KA --> MCP
     SV --> RULES
     MEM --> PA
-    CR -->|PASS| SA
-    CR -->|PASS| SCREEN
-    CR -->|REVISE| PP
-    Multi_Agent_Core -.-> TRACE["Observability & Execution Trace"]
+
+    %% Closed-Loop Feedback
+    SCREEN -->|Post-Practice Feedback & Rating| FB["Session Feedback Event"]
+    FB --> MEM
+
+    %% Observability Streams
+    Multi_Agent_Core -.-> TRACE
+    Multimodal_Pipeline -.-> TRACE
+    TRACE --> MET
+    MET --> EVAL
+    EVAL --> DASH
 ```
 
 ------------------------------------------------------------------------
@@ -454,6 +483,10 @@ parallelism is safe.
 Agents communicate indirectly through shared state.
 
 ``` mermaid
+---
+config:
+  layout: elk
+---
 flowchart TB
     B[("Shared Blackboard / ADK Session State")]
 
@@ -506,6 +539,10 @@ concept while keeping agent responsibilities isolated.
 The Root Manager acts as the coordination layer.
 
 ``` mermaid
+---
+config:
+  layout: elk
+---
 flowchart TD
     R["Root Manager Agent"]
 
@@ -601,33 +638,54 @@ sequenceDiagram
 Event-driven behavior governs session completion, feedback, live posture deviations, and voice commands without blocking the main workflow.
 
 ``` mermaid
-flowchart TD
+---
+config:
+  layout: dagre
+---
+flowchart BT
     subgraph Session_Lifecycle_Events["Session Lifecycle & Memory Events"]
-        E1["SessionCompleted Event"] --> F["Feedback Processing"]
-        E1 --> M["Memory Update"]
-        E1 --> EV["Evaluation Pipeline"]
-        F --> P["User Preference Update"]
-        M --> PM[("Persistent Memory")]
-        EV --> TS[("Evaluation Store")]
+        F["Feedback Processing"]
+        E1["SessionCompleted Event"]
+        M["Memory Update"]
+        EV["Evaluation Pipeline"]
+        P["User Preference Update"]
+        PM[("Persistent Memory")]
+        TS[("Evaluation Store")]
     end
 
     subgraph RealTime_Posture_Events["Real-Time Posture & Multimodal Events"]
-        V1["Webcam Frame Ingested"] --> V2["Angle Calculation"]
-        V2 -->|Deviation > Threshold| E2["PostureDeviation Event"]
-        E2 --> POA["Pose Understanding Agent"]
-        POA --> SA["Speech / Audio Agent (TTS Cue)"]
-        
-        V2 -->|Hold Target Reached| E3["PoseHoldCompleted Event"]
-        E3 --> ADVANCE["Transition to Next Asana Sequence"]
-
-        AUDIO["User Voice Utterance"] --> E4["VoiceCommand Event"]
-        E4 --> DISPATCH["Hands-Free Voice Dispatcher"]
+        V2["Angle Calculation"]
+        V1["Webcam Frame Ingested"]
+        E2["PostureDeviation Event"]
+        POA["Pose Understanding Agent"]
+        SA["Speech / Audio Agent (TTS Cue)"]
+        E3["PoseHoldCompleted Event"]
+        ADVANCE["Transition to Next Asana Sequence"]
+        E4["VoiceCommand Event"]
+        AUDIO["User Voice Utterance"]
+        DISPATCH["Hands-Free Voice Dispatcher"]
     end
 
     subgraph Safety_Events["Safety Escalation Events"]
-        S["Severe Strain / Contraindication Detected"] --> E5["SafetyConcern Event"]
-        E5 --> STOP["Audio Alert: Stop & Rest / Clarify"]
+        E5["SafetyConcern Event"]
+        S["Severe Strain / Contraindication Detected"]
+        STOP["Audio Alert: Stop & Rest / Clarify"]
     end
+
+    E1 --> F & M & EV
+    F --> P
+    M --> PM
+    EV --> TS
+    V1 --> V2
+    V2 -->|Deviation > Threshold| E2
+    E2 --> POA
+    POA --> SA
+    V2 -->|Hold Target Reached| E3
+    E3 --> ADVANCE
+    AUDIO --> E4
+    E4 --> DISPATCH
+    S --> E5
+    E5 --> STOP
 ```
 
 This allows the system to react to events without forcing high-frequency frame operations into synchronous LLM workflows.
@@ -723,7 +781,7 @@ concrete benefit.
                                                   output
 
   Advanced Planner        **ToT-style             Compare candidate plans
-                          exploration**           
+                          exploration**
   -----------------------------------------------------------------------
 
 Raw private chain-of-thought will **not** be displayed to users.
@@ -795,7 +853,11 @@ RAG is a mandatory project component.
 The knowledge pipeline will be:
 
 ``` mermaid
-flowchart LR
+---
+config:
+  layout: dagre
+---
+flowchart TB
     D["Curated Yoga Documents"] --> L["Document Loader"]
     L --> C["Chunking & Line Mapping"]
     C --> M["Provenance Metadata\n(File, Chunk ID, Lines, Hash)"]
@@ -1039,6 +1101,10 @@ not as a medical diagnosis system.
 ## Validation order
 
 ``` mermaid
+---
+config:
+  layout: elk
+---
 flowchart TD
     A["Generated Plan"] --> B["Deterministic Rule Checks"]
     B -->|Fail| X["Reject / Revise"]
@@ -1106,6 +1172,10 @@ a clinically validated measure.
 The planner and critic form an iterative workflow.
 
 ``` mermaid
+---
+config:
+  layout: elk
+---
 flowchart LR
     P["Planner"] --> C["Critic"]
     C -->|PASS| F["Final Plan"]
@@ -1333,28 +1403,32 @@ Therefore, YogaSutra **rejects pure Agent-as-Judge as the final arbiter** and es
 ### Two-Tier Evaluation Architecture
 
 ``` mermaid
+---
+config:
+  layout: elk
+---
 flowchart TD
     RUN["YogaSutra Multi-Agent Run Output\n(Plan + Chunk Claims + Audio Cues)"] --> T1["Tier 1: Automated Advisory Pre-Screen\n(Deterministic Rules + Critic Reflection)"]
-    
+
     T1 -->|Pre-Screen Flag: Violation| REV["Agent Self-Revision Loop"]
     REV --> RUN
-    
+
     T1 -->|Pre-Screen: Cleared| TRACE["Per-Run Structured Execution Trace\n(Logged to Evaluation Store)"]
-    
+
     TRACE --> T2["Tier 2: Human-in-the-Loop (HITL) Expert Panel\n(Certified Yoga Instructors & Domain Evaluators)"]
-    
+
     subgraph HITL_Rubric["Human Evaluation Rubric (1–5 Likert)"]
         R1["1. Biomechanical Safety\n(Anatomical risk & contraindications)"]
         R2["2. Chunk Claim Fidelity\n(Audit claim against source file chunk)"]
         R3["3. Physiological Sequencing\n(Warm-up, peak pose, cool-down flow)"]
         R4["4. Hands-Free Usability\n(Auditory pacing & voice cue clarity)"]
     end
-    
+
     T2 --> R1
     T2 --> R2
     T2 --> R3
     T2 --> R4
-    
+
     R1 --> FINAL["Final Benchmark Scorecard & Inter-Rater Reliability (Kappa)"]
     R2 --> FINAL
     R3 --> FINAL
@@ -1412,6 +1486,10 @@ flowchart TD
 ### Configuration C --- Blackboard
 
 ``` mermaid
+---
+config:
+  layout: elk
+---
 flowchart TB
     S[("Shared State")]
     A["Profile"] <--> S
@@ -1424,6 +1502,10 @@ flowchart TB
 ### Configuration D --- Hierarchical
 
 ``` mermaid
+---
+config:
+  layout: elk
+---
 flowchart TD
     R["Manager"] --> A["Profile"]
     R --> B["Knowledge"]
@@ -1723,7 +1805,11 @@ permit.
 The system will support escalation.
 
 ``` mermaid
-flowchart LR
+---
+config:
+  layout: elk
+---
+flowchart TB
     A["Task"] --> F["Fast / Low-Cost Model"]
     F --> V["Quality Check"]
 
@@ -1791,44 +1877,30 @@ services consistently and concurrently.
 ## 32.1 Runtime Architecture
 
 ``` mermaid
+---
+config:
+  layout: elk
+---
 flowchart TB
-    UI["Next.js Frontend Container"] --> API["FastAPI + ADK Container"]
-
-    API --> ROUTER["Model Router"]
-    ROUTER --> G["Model Gateway"]
-
-    G --> GPT["OpenAI"]
-    G --> CL["Anthropic"]
-    G --> GE["Google Gemini"]
-    G --> DS["DeepSeek"]
-    G --> QW["Qwen"]
-    G --> KM["Kimi / Moonshot"]
-
-    API --> RAG["RAG Service"]
-    RAG --> PG[("PostgreSQL + pgvector")]
-
-    API --> MCP["MCP Server"]
-
-    API --> MEM[("Persistent Memory")]
-
-    API --> OBS["OpenTelemetry Collector"]
-
-    OBS --> TRACE["Trace / Metrics Backend"]
-
-    RAG --> CACHE["Cache"]
-
     subgraph DOCKER["Docker Compose Runtime"]
-        API
-        ROUTER
-        G
-        RAG
-        MCP
-        PG
-        MEM
-        CACHE
-        OBS
-        UI
+        API["FastAPI + ADK Container"]
+        ROUTER["Model Router"]
+        G["Model Gateway"]
+        RAG["RAG Service"]
+        MCP["MCP Server"]
+        PG[("PostgreSQL + pgvector")]
+        MEM[("Persistent Memory")]
+        CACHE["Cache"]
+        OBS["OpenTelemetry Collector"]
+        UI["Next.js Frontend Container"]
     end
+
+    UI --> API
+    API --> ROUTER & RAG & MCP & MEM & OBS
+    ROUTER --> G
+    G --> GPT["OpenAI"] & CL["Anthropic"] & GE["Google Gemini"] & DS["DeepSeek"] & QW["Qwen"] & KM["Kimi / Moonshot"]
+    RAG --> PG & CACHE
+    OBS --> TRACE["Trace / Metrics Backend"]
 ```
 
 External model providers remain external APIs; Docker controls the
@@ -1930,6 +2002,10 @@ invocation.
 Every model/tool invocation receives a timeout and budget.
 
 ``` mermaid
+---
+config:
+  layout: elk
+---
 flowchart TD
     A["Request"] --> B["Global 30s Deadline"]
     B --> C["Router"]
@@ -2056,6 +2132,10 @@ The observability layer must capture both **agent behavior and
 model-routing behavior**.
 
 ``` mermaid
+---
+config:
+  layout: elk
+---
 flowchart TB
     R["Request"] --> M["Master Agent"]
 
@@ -2501,6 +2581,10 @@ Build the complete core agentic workflow with bidirectional hands-free speech co
 ### Phase 2 Prototype
 
 ``` mermaid
+---
+config:
+  layout: elk
+---
 flowchart TD
     U["User\n(Voice or Text)"] --> SA["Speech / Audio Agent"]
     U --> R["Root Manager"]
@@ -2590,7 +2674,7 @@ At least 40 runs; target 44+.
 # Phase 3A --- Advanced Agent Intelligence & Event-Driven Architecture
 
 ### Dependency Order
-**Prerequisites**: Phase 2 (Completed ✅)  
+**Prerequisites**: Phase 2 (Completed ✅)
 **Rationale**: Before real-time video posture correction or complex UI dashboards can be built, the system requires the underlying asynchronous event backbone (`event_driven.py`), event schemas, and search-based planning reasoning (ToT + utility ranking).
 
 ### Deliverables
@@ -2610,7 +2694,7 @@ At least 40 runs; target 44+.
 # Phase 3B --- Modular Real-Time Computer Vision Posture Engine
 
 ### Dependency Order
-**Prerequisites**: Phase 3A (Event-Driven Bus & `PostureDeviationEvent` schema)  
+**Prerequisites**: Phase 3A (Event-Driven Bus & `PostureDeviationEvent` schema)
 **Rationale**: Posture analysis runs as a decoupled high-speed worker that emits deviation events into the Phase 3A Event Bus. Building the CV pipeline before the event layer would result in tight coupling or blocking the main agent loop.
 
 ### High-Efficiency Edge & Client Hardware Optimization
@@ -2654,7 +2738,7 @@ To eliminate any risk of LLM hallucinations during live biomechanical analysis:
 # Phase 3C --- Fullstack Live Practice Studio UI & Observability Dashboard
 
 ### Dependency Order
-**Prerequisites**: Phase 3A (Event Bus) & Phase 3B (CV Engine & Joint Landmarks)  
+**Prerequisites**: Phase 3A (Event Bus) & Phase 3B (CV Engine & Joint Landmarks)
 **Rationale**: The interactive UI requires both the live skeletal landmark stream from Phase 3B to draw the wireframe canvas and the event bus from Phase 3A to display traces and real-time audio playback.
 
 ### Deliverables
@@ -2672,7 +2756,7 @@ To eliminate any risk of LLM hallucinations during live biomechanical analysis:
 # Phase 4 --- Scientific Evaluation & Benchmark Experiments (40+ Runs)
 
 ### Dependency Order
-**Prerequisites**: Phase 3C (Complete operational system across text, speech, vision, and UI)  
+**Prerequisites**: Phase 3C (Complete operational system across text, speech, vision, and UI)
 **Rationale**: Empirical benchmarking and expert evaluations require a fully integrated, operational system. Testing an incomplete system produces invalid evaluation data.
 
 ### Deliverables
@@ -2694,7 +2778,7 @@ To eliminate any risk of LLM hallucinations during live biomechanical analysis:
 # Phase 5 --- Enterprise Containerization & Production Docker Packaging
 
 ### Dependency Order
-**Prerequisites**: Phase 3C (Fullstack Live Practice Studio UI) & Phase 4 (Empirical Evaluation Benchmarks)  
+**Prerequisites**: Phase 3C (Fullstack Live Practice Studio UI) & Phase 4 (Empirical Evaluation Benchmarks)
 **Rationale**: Containerizing the verified multi-agent system, vision pipeline, and frontend into a production-grade container orchestration stack enables zero-friction, repeatable commercial deployment for client handover and enterprise cloud hosting.
 
 ### Deliverables
@@ -2728,7 +2812,7 @@ To eliminate any risk of LLM hallucinations during live biomechanical analysis:
 # Phase 6 --- Client Handover, Final Technical Report & Defense Deliverables
 
 ### Dependency Order
-**Prerequisites**: Phase 4 (Evaluation Benchmarks) & Phase 5 (Enterprise Containerization)  
+**Prerequisites**: Phase 4 (Evaluation Benchmarks) & Phase 5 (Enterprise Containerization)
 **Rationale**: Final technical reports, client handover packages, and presentation decks must report verified empirical metrics and containerized deployment artifacts.
 
 ### Deliverables
@@ -2741,73 +2825,42 @@ To eliminate any risk of LLM hallucinations during live biomechanical analysis:
 
 ------------------------------------------------------------------------
 
-# 35. Final System Architecture
+# 35. System Architectural Synthesis & Integration Matrix
 
-``` mermaid
-flowchart TB
-    subgraph UI_Layer["Next.js Multimodal Interface"]
-        UI["Web UI Dashboard"]
-        VOICE["Microphone & Audio Player"]
-        VISION["Live Practice Video Canvas"]
-    end
+The comprehensive visual architecture of YogaSutra is unified in **[6. System Architecture](#6-system-architecture)**. This section synthesizes the cross-subsystem contracts, interaction protocols, and runtime SLAs governing all system components.
 
-    UI --> R["Root Manager"]
-    VOICE <--> SA["Speech / Audio Agent"]
-    SA <--> R
+### 35.1 Multi-Tier Architectural Topology
 
-    subgraph MAS["YogaSutra Multi-Agent Core System"]
-        R --> P["Profile Agent"]
-        R --> K["Knowledge / RAG Agent"]
-        R --> PL["Practice Planner"]
-        R --> SV["Safety & Constraint"]
-        R --> CR["Critic / Reflection"]
-        R --> SA
+The complete production system integrates seven distinct operational tiers into a cohesive, decoupled runtime:
 
-        P <--> ST[("ADK Session State\n(Blackboard)")]
-        K <--> ST
-        PL <--> ST
-        SV <--> ST
-        CR <--> ST
-        SA <--> ST
+1. **Multimodal Edge Client Tier (`frontend`)**: Next.js / React application rendering the live HTML5 WebRTC/Canvas skeleton overlay, bidirectional Web Speech / ElevenLabs audio player, session planner interface, and real-time posture telemetry HUD.
+2. **Multi-Agent Reasoning Core (`api`)**: Google ADK-powered MAS orchestrating Root Manager, Profile, Knowledge/RAG, Practice Planner, Safety & Constraint, Critic/Reflection, and Speech agents over a shared Blackboard state.
+3. **High-Speed Biomechanics Engine (`app/vision`)**: Pure-Python 3D vector geometry pipeline consuming 480p clamped video frames, extracting 33 MediaPipe Pose landmarks in <12ms, and verifying physical joint angles against classical criteria matrices with zero LLM hallucination.
+4. **Reactive Event Bus (`app/events`)**: Asynchronous, non-blocking event-driven bus decoupling high-frequency video frames and voice inputs from synchronous agent planning loops (`PostureDeviationEvent`, `VoiceCommandEvent`, `SessionFeedbackEvent`).
+5. **Knowledge, Tools & Persistence (`data`)**: PostgreSQL + pgvector vector store, Model Context Protocol (MCP) tool server, auditable classical chunk registry (`corpus.json`), and long-term user practice memory (`data/memory`).
+6. **Observability & Evaluation Layer (`app/observability`)**: OpenTelemetry distributed tracing, real-time latency/WER/FPS metrics collector, and interactive Streamlit analytics dashboard (`app/ui/dashboard.py`).
+7. **Container Orchestration Runtime (`docker-compose.yml`)**: Production multi-container stack with network isolation, healthchecks, volume persistence, and strict CPU/memory limits.
 
-        CR -->|Pass| OUT["Final Response"]
-        CR -->|Revision| PL
-    end
+### 35.2 Subsystem Integration & Protocol Matrix
 
-    subgraph CV_Plugin["Modular Computer Vision Plug-in (Practice Mode)"]
-        VISION --> CAM["OpenCV Video Stream"]
-        CAM --> MP["MediaPipe / YOLO-Pose Engine"]
-        MP --> GEOM["Joint Angle & Biomechanics Analyzer"]
-        GEOM -->|PostureDeviationEvent| POA["Pose Understanding & Correction Agent"]
-        POA <--> ST
-        POA -->|Spoken Cue| SA
-        GEOM -->|Skeleton Overlay & HUD| VISION
-    end
+| Source Subsystem | Target Subsystem | Interaction Pattern | Transport / Protocol | Message / Payload Schema | SLA / Target Latency | Failure & Recovery Policy |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Webcam Driver** | **Frame Ingestion Worker** | Streaming Ingestion | OpenCV VideoCapture | Clamped 480p RGB Frame Buffer | < 5 ms | Drop stale frame via `Queue(maxsize=1)` |
+| **Biomechanics Engine** | **Pose Agent** | Event-Driven Publish | In-Process Event Bus | `PostureDeviationEvent` (joint, angle, target, severity) | < 2 ms | 1.5s temporal debounce filter |
+| **Pose Agent** | **Speech Agent** | Asynchronous Dispatch | Event Bus / In-Memory Queue | Corrective Audio Cue String | < 10 ms | Priority override: Interrupt routine cues |
+| **Speech Agent** | **Client Audio Player** | Streaming Audio | WebSocket / Audio Chunk Stream | PCM / MP3 Chunk Stream (ElevenLabs / TTS) | < 1,500 ms TTFB | Fallback to Web Speech API locally |
+| **Client UI** | **Root Manager** | Request / Response | REST (HTTP/2 JSON) | `UserGoalRequest` (prompt, constraints, time) | < 200 ms | Return 422 with input validation message |
+| **Planner Agent** | **Safety / Critic Agents** | Hierarchical / Sequential | Shared Blackboard (`SessionState`) | `PracticePlan` schema (asanas, duration, cues) | < 3,000 ms | Reflection loop triggers up to 2 revisions |
+| **Knowledge Agent** | **MCP / pgvector** | Tool Invocation | MCP JSON-RPC / SQL | `RetrievalQuery` -> `ChunkEvidence` with line provenance | < 400 ms | Fallback to cached local `corpus.json` |
+| **Client Session UI** | **Long-Term Memory** | Post-Session Push | Event Bus -> File Store | `SessionFeedbackEvent` (rating, fatigue, notes) | Asynchronous | Write to disk journal; retry on lock error |
+| **All MAS Agents** | **Telemetry Collector** | Background Tracing | OpenTelemetry / In-Memory Queue | `TraceSpan` (agent, tool, latency_ms, tokens, status) | Zero overhead (< 1 ms) | Drop telemetry if buffer reaches 90% |
 
-    K --> PG[("PostgreSQL + pgvector\n(Asanas & Biomechanics)")]
-    K --> MCP["MCP Server"]
-    SV --> RULES[("Constraint / Safety Rules")]
+### 35.3 System Invariants
 
-    OUT --> UI
-    OUT --> SA
-    UI --> FB["Feedback Event"]
-    FB --> MEM[("Persistent User Memory")]
-    MEM --> P
-
-    subgraph OBS["Observability & Evaluation"]
-        TRACE["Execution Traces"]
-        MET["Metrics (Latency, WER, CV FPS)"]
-        EVAL["Evaluation Engine"]
-        DASH["Analysis Dashboard"]
-    end
-
-    MAS -.-> TRACE
-    CV_Plugin -.-> TRACE
-
-    TRACE --> MET
-    MET --> EVAL
-    EVAL --> DASH
-```
+To guarantee production reliability and safety across all tiers:
+- **Zero-Hallucination Invariant**: Joint angle calculations and posture deviation flags are 100% computed via deterministic 3D trigonometry. LLMs never perform visual landmark estimation.
+- **Strict Safety Gate Invariant**: No practice plan is ever presented to the user or dispatched to the audio engine without passing explicit constraint checks and Critic validation.
+- **Bounded Latency Invariant**: Any camera frame arriving while the biomechanics engine is processing is discarded immediately (`Queue(maxsize=1)`), guaranteeing the user never experiences cumulative posture tracking delay.
 
 ------------------------------------------------------------------------
 
