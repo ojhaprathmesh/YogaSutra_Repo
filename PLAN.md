@@ -129,13 +129,14 @@ Yoga practice is inherently physical and hands-free. The system supports:
 
 ### Modular Real-Time Video Posture Correction (CV Extension)
 
-A decoupled, plug-and-play computer vision pipeline that can be activated during practice:
+A decoupled, plug-and-play computer vision pipeline that can be activated during practice, engineered for high-efficiency edge execution and resource-constrained environments (sub-100MB active memory footprint, 30 FPS throughput):
 
--   real-time video ingestion via OpenCV;
--   skeletal keypoint extraction via MediaPipe Pose (33 3D landmarks) or YOLOv8-pose (17 keypoints);
--   deterministic geometric joint angle computation (knee flexion, hip-shoulder symmetry, spinal alignment);
--   event-driven posture deviation detection against curated asana biomechanics;
--   real-time corrective cues dispatched via visual overlay HUD and synthesized speech.
+-   **High-Efficiency Ingestion Clamping**: Real-time OpenCV frame capture clamped immediately to 480p (640×480) at capture boundary, reducing per-frame memory bandwidth by 85% (from >6MB down to <900KB per frame);
+-   **Zero-Lag Bounded Buffering**: Bounded ring buffer `Queue(maxsize=1)` dropping stale frames to prevent buffer bloat and guarantee zero cumulative frame latency;
+-   **Lightweight 3D Pose Extraction**: MediaPipe Pose Lite (`model_complexity=0`, `enable_segmentation=False`) extracting 33 3D skeletal landmarks under <60MB active RAM with sub-12ms inference;
+-   **Zero-Hallucination Biomechanical Engine**: 100% deterministic pure-Python 3D vector geometry ($\arccos$ dot product) computing exact joint angles (knee flexion, spinal verticality, shoulder/hip symmetry) with zero LLM hallucination;
+-   **Event-Driven Closed Feedback Loop**: Emits `PostureDeviationEvent` into the Phase 3A Event Bus when joint angles deviate from classical `corpus.json` asana criteria for >1.5s;
+-   **Real-Time Telemetry HUD**: Live on-screen display of FPS (25–30 FPS), inference latency (<12ms), and active memory consumption (<100MB).
 
 ### Personalization
 
@@ -2193,13 +2194,15 @@ collection of API integrations.
 
 ## Phase 3B — Modular Real-Time Computer Vision Posture Engine
 
--   [ ] Video frame ingestion worker via OpenCV operational (`app/vision/detector.py`)
--   [ ] MediaPipe 3D Pose estimation (33 skeletal landmarks) integrated
--   [ ] Pure-Python deterministic biomechanical joint calculator operational (<10ms latency)
--   [ ] Knee flexion, spinal alignment, and shoulder/hip symmetry angle verification
--   [ ] Pose Understanding & Correction Agent (`app/agents/pose/agent.py`) operational
+-   [ ] Video frame ingestion worker via OpenCV operational with 480p capture clamp and zero-lag bounded buffer (`app/vision/detector.py`)
+-   [ ] MediaPipe 3D Pose Lite (`model_complexity=0`, `enable_segmentation=False`) integrated under <60MB RAM footprint
+-   [ ] Zero-hallucination pure-Python deterministic 3D vector geometry calculator operational (<2ms latency, `app/vision/biomechanics.py`)
+-   [ ] Knee flexion, elbow flexion, spinal verticality, and shoulder/hip symmetry angle verification
+-   [ ] Classical asana reference criteria matrix established (`app/vision/criteria.py`)
+-   [ ] Pose Understanding & Correction Agent (`app/agents/pose/agent.py`) operational with 1.5s temporal debounce
 -   [ ] Closed-loop corrective cues dispatched to SpeechAgent via `PostureDeviationEvent`
--   [ ] Unit tests for 3D biomechanics calculations and PoseAgent passing
+-   [ ] Standalone interactive verification CLI runner (`scripts/run_pose_detector.py`) with telemetry HUD (FPS, latency, RAM)
+-   [ ] Unit tests for 3D biomechanics calculations, zero-hallucination assertion, and PoseAgent passing
 
 ## Phase 3C — Fullstack Live Practice Studio UI & Observability Dashboard
 
@@ -2220,13 +2223,24 @@ collection of API integrations.
 -   [ ] CriticAgent reflection loop ablation study completed
 -   [ ] End-to-end latency benchmark with p95 measured against 30-second ceiling
 
-## Phase 5 — Production Deployment, Final Report & Defense Deliverables
+## Phase 5 — Enterprise Containerization & Production Docker Packaging
 
--   [ ] Multi-container Docker Compose production stack operational (`api`, `frontend`, `mcp-server`, `eval-runner`)
--   [ ] Container resource limits, caching, and healthchecks configured
--   [ ] Comprehensive IEEE-style academic final report completed (`docs/FINAL_REPORT.md`)
--   [ ] Presentation slide deck and live demo script completed
--   [ ] Viva defense preparation guide with architectural rationale completed
+-   [ ] Production multi-stage backend Dockerfile (`Dockerfile.backend`) with non-root security user & minimal slim runtime
+-   [ ] Production frontend Dockerfile (`Dockerfile.frontend`) with multi-stage build optimization
+-   [ ] Orchestrated `docker-compose.yml` and `docker-compose.prod.yml` with isolated networks (`api`, `frontend`, `reverse-proxy`)
+-   [ ] Enterprise resource quotas, health checks, and restart policies configured for client host environments
+-   [ ] Persistent volume orchestration for practice memory (`data/memory`), corpus (`data/corpus.json`), and model caches
+-   [ ] Reverse proxy configuration (Nginx) with WebSocket / WebRTC support, CORS, and TLS termination
+-   [ ] Production environment template (`.env.production.example`) with secret masking and strict validation
+-   [ ] Automated container smoke tests and CI verification script (`scripts/docker_smoke_test.sh`)
+-   [ ] Enterprise client deployment guide & runbook (`docs/DEPLOYMENT_GUIDE.md`)
+
+## Phase 6 — Client Handover, Final Technical Report & Defense Deliverables
+
+-   [ ] Comprehensive IEEE-style academic final report & enterprise technical whitepaper completed (`docs/FINAL_REPORT.md`)
+-   [ ] Turnkey Client Handover Package with SLA verification and architectural runbook
+-   [ ] Executive presentation slide deck and live interactive demonstration script completed
+-   [ ] Viva defense & technical review preparation guide with design rationale completed
 
 # 32. Observability Architecture
 
@@ -2599,18 +2613,41 @@ At least 40 runs; target 44+.
 **Prerequisites**: Phase 3A (Event-Driven Bus & `PostureDeviationEvent` schema)  
 **Rationale**: Posture analysis runs as a decoupled high-speed worker that emits deviation events into the Phase 3A Event Bus. Building the CV pipeline before the event layer would result in tight coupling or blocking the main agent loop.
 
+### High-Efficiency Edge & Client Hardware Optimization
+High-resolution camera feeds (e.g. 1080p/4K webcams) stream uncompressed video frames at >6MB per frame, which can quickly saturate system bus bandwidth and induce thermal and memory throttling on edge workstations, laptops, or resource-constrained client machines (e.g. ≤8GB RAM environments). To guarantee enterprise-grade stability, sub-15ms processing turnaround, and an ultra-lean (<100MB active memory) footprint, Phase 3B enforces 5 production-grade streamlining optimizations:
+1. **Immediate Ingestion Clamping**: Clamps video capture at the driver/capture boundary to 480p (640×480), reducing per-frame RAM allocation from 6.2MB to <900KB (an 85% bandwidth reduction).
+2. **Bounded Buffer Ring (`Queue(maxsize=1)`)**: Drops stale frames whenever processing lags, guaranteeing zero cumulative latency lag and preventing memory buffer bloat.
+3. **MediaPipe Pose Lite Runtime (`model_complexity=0`, `enable_segmentation=False`)**: Disables background segmentation (which consumes over 60% of CV memory) to achieve an ultra-compact ~6MB model footprint running in 8–12ms on modern CPUs.
+4. **Adaptive Decoupled Inference Rate**: Decouples smooth 30 FPS display rendering from 12–15 FPS skeletal inference with lightweight exponential smoothing, cutting CPU compute in half during static yoga holds.
+5. **Zero-Allocation In-Place Mathematics**: Pure-Python 3D vector geometry without heap churn, executing angle calculations in <2ms.
+
+### Zero-Hallucination Guarantee
+To eliminate any risk of LLM hallucinations during live biomechanical analysis:
+- **No LLM in the measurement loop**: Joint angles are calculated deterministically via 3D vector geometry:
+  $$\theta = \arccos\left(\frac{\mathbf{u} \cdot \mathbf{v}}{\|\mathbf{u}\| \|\mathbf{v}\|}\right)$$
+- **Deterministic Asana Reference Matrix (`app/vision/criteria.py`)**: Exact target intervals derived from classical `corpus.json` literature (e.g. Virabhadrasana II front knee $90^\circ \pm 5^\circ$; Tadasana spine deviation $<5^\circ$).
+- **Temporal Debounce Filter**: Deviances must persist $>1.5\text{s}$ before triggering alerts, eliminating sensor noise and twitch alarms.
+- **Direct Cue Mapping**: Corrective feedback is mapped directly from validated biomechanical rules, not generated stochastically.
+
 ### Deliverables
 1. **Video Ingestion & 3D Pose Extraction (`app/vision/detector.py`)**:
-   - OpenCV video frame ingestion worker (webcam / video stream).
-   - MediaPipe Pose extracting 33 3D skeletal landmarks.
+   - OpenCV video frame ingestion worker (webcam / video stream / test image).
+   - Ingestion clamping to 640×480 with zero-lag bounded buffer queue.
+   - MediaPipe Pose Lite extracting 33 3D skeletal landmarks (<60MB active RAM).
 2. **Deterministic Biomechanical Joint Calculator (`app/vision/biomechanics.py`)**:
-   - Fast pure-Python trigonometric 3D angle calculations (<10ms per frame):
-     - Knee flexion angle (e.g. 90° check in Virabhadrasana II).
-     - Spinal verticality and lumbar hyperextension.
-     - Shoulder-hip horizontal level and hip squareness.
-3. **Pose Understanding & Correction Agent (`app/agents/pose/agent.py`)**:
-   - Compares live joint angles against classical RAG asana criteria from `corpus.json`.
+   - Fast pure-Python trigonometric 3D angle calculations (<2ms turnaround):
+     - Knee flexion angle (left and right)
+     - Elbow flexion angle (left and right)
+     - Spinal verticality and lateral torso alignment
+     - Shoulder-hip horizontal level and hip squareness
+3. **Classical Asana Criteria Standards (`app/vision/criteria.py`)**:
+   - Grounded angle thresholds for core asanas (Virabhadrasana II, Tadasana, Vrikshasana, Utkatasana, Bhujangasana).
+4. **Pose Understanding & Correction Agent (`app/agents/pose/agent.py`)**:
+   - Compares live joint angles against criteria table with 1.5s temporal debounce.
    - Generates high-priority corrective voice cues dispatched to `SpeechAgent` via `PostureDeviationEvent`.
+5. **Standalone Interactive Verification CLI (`scripts/run_pose_detector.py`)**:
+   - Supports `--webcam 0`, `--image <path>`, and `--video <path>`.
+   - On-screen telemetry HUD displaying live FPS, inference latency (ms), and active RAM consumption (MB).
 
 ------------------------------------------------------------------------
 
@@ -2654,20 +2691,53 @@ At least 40 runs; target 44+.
 
 ------------------------------------------------------------------------
 
-# Phase 5 --- Production Packaging, Final Report & Defense Deliverables
+# Phase 5 --- Enterprise Containerization & Production Docker Packaging
 
 ### Dependency Order
-**Prerequisites**: Phase 4 (Empirical evaluation results and metrics finalized)  
-**Rationale**: Academic reports, defense slide decks, and final container configurations must report the exact empirical data and verified metrics gathered during Phase 4.
+**Prerequisites**: Phase 3C (Fullstack Live Practice Studio UI) & Phase 4 (Empirical Evaluation Benchmarks)  
+**Rationale**: Containerizing the verified multi-agent system, vision pipeline, and frontend into a production-grade container orchestration stack enables zero-friction, repeatable commercial deployment for client handover and enterprise cloud hosting.
 
 ### Deliverables
-1. **Containerized Production Deployment (`docker-compose.yml`)**:
-   - Multi-container stack: `api` (FastAPI backend), `frontend` (Live Studio UI), `mcp-server`, and `eval-runner`.
-   - Container resource limits, healthchecks, and caching controls.
+1. **Production-Grade Multi-Stage Dockerfiles**:
+   - `Dockerfile.backend`: Multi-stage build on Debian slim/Alpine with Python 3.12, separating compilation dependencies from runtime, running under a dedicated non-root `appuser`, minimizing attack surface and image size.
+   - `Dockerfile.frontend`: Multi-stage build compiling static/standalone Next.js/Vite bundles served via a hardened, ultra-lightweight Alpine runtime.
+2. **Enterprise Container Orchestration (`docker-compose.yml` & `docker-compose.prod.yml`)**:
+   - Multi-container architecture:
+     - `api`: FastAPI MAS core, computer vision, and speech endpoints with Uvicorn/Gunicorn workers.
+     - `frontend`: Live Practice Studio UI.
+     - `reverse-proxy`: Hardened Nginx container handling SSL/TLS termination, HTTP/2, WebSocket / WebRTC streaming, and CORS enforcement.
+     - `eval-runner`: On-demand container for isolated CI/CD regression testing and performance benchmarking.
+   - Network segmentation (isolated backend network vs public-facing DMZ network).
+   - Strict resource governance (`deploy.resources.limits` for CPU and memory ceilings) ensuring predictable performance across host environments.
+   - Standardized container health checks (`HEALTHCHECK`) with automated restart policies.
+3. **Data Persistence & Caching Volumes**:
+   - Dedicated named volumes for persistent user practice memory (`data/memory`), classical knowledge corpus (`data/corpus.json`), and model weight/audio caches (`data/cache`).
+4. **Security, Secrets & Configuration Management**:
+   - Production environment template (`.env.production.example`) with strict runtime validation and zero secret leakage.
+   - Support for Docker secrets and environment-driven configuration across dev, staging, and production tiers.
+5. **Cross-Platform & Hardware Acceleration Support**:
+   - Multi-architecture container builds supporting both `linux/amd64` and `linux/arm64` (AWS Graviton, Apple Silicon, and Intel/AMD servers).
+   - Optional GPU pass-through flags for NVIDIA Container Toolkit acceleration where available.
+6. **Automated Smoke Test & Build Pipeline (`scripts/docker_smoke_test.sh`)**:
+   - Automated script building images, spinning up the compose stack, validating `/health` and WebSocket handshakes, and asserting end-to-end responsiveness.
+7. **Client Handover & Deployment Runbook (`docs/DEPLOYMENT_GUIDE.md`)**:
+   - Turnkey, professional operations manual covering single-command deployment (`docker compose up -d`), environment provisioning, backup/restore procedures, and cloud migration (AWS ECS, GCP Cloud Run, Azure Container Instances).
+
+------------------------------------------------------------------------
+
+# Phase 6 --- Client Handover, Final Technical Report & Defense Deliverables
+
+### Dependency Order
+**Prerequisites**: Phase 4 (Evaluation Benchmarks) & Phase 5 (Enterprise Containerization)  
+**Rationale**: Final technical reports, client handover packages, and presentation decks must report verified empirical metrics and containerized deployment artifacts.
+
+### Deliverables
+1. **Turnkey Client Handover Package & SLA Verification**:
+   - Client-ready deliverables bundle, SLA compliance audit (latency, uptime, safety guarantees), and administrative operations manual.
 2. **Comprehensive Final Technical Project Report (`docs/FINAL_REPORT.md`)**:
-   - IEEE / Academic MAS standard: Problem Statement, PEAS, Multi-Agent Architecture, RAG Grounding, Safety Proofs, Empirical Evaluation Results, and Architectural Trade-off Analysis.
-3. **Final Presentation & Viva Defense Package**:
-   - Slide deck outline, architecture demo script, and comprehensive Q&A preparation guide addressing multi-agent design decisions.
+   - IEEE / Academic MAS standard: Problem Statement, PEAS Framework, Multi-Agent Architecture, RAG Grounding, Safety Proofs, Empirical Evaluation Results, and Architectural Trade-off Analysis.
+3. **Executive Presentation & Viva Defense Package**:
+   - Professional slide deck outline, interactive live demonstration script, and comprehensive Q&A preparation guide addressing multi-agent architectural rationale.
 
 ------------------------------------------------------------------------
 
@@ -3180,12 +3250,14 @@ medical diagnosis or treatment claims.
 
 ## Phase 3B — Modular Real-Time Computer Vision Posture Engine
 
--   [ ] Video frame ingestion worker via OpenCV operational (`app/vision/detector.py`)
--   [ ] MediaPipe 3D Pose estimation (33 skeletal landmarks) integrated
--   [ ] Pure-Python deterministic biomechanical joint calculator operational (<10ms latency)
--   [ ] Pose Understanding & Correction Agent (`app/agents/pose/agent.py`) operational
+-   [ ] Video frame ingestion worker via OpenCV operational with 480p capture clamp and zero-lag bounded buffer (`app/vision/detector.py`)
+-   [ ] MediaPipe 3D Pose Lite (`model_complexity=0`, `enable_segmentation=False`) integrated under <60MB RAM footprint
+-   [ ] Zero-hallucination pure-Python deterministic 3D vector geometry calculator operational (<2ms latency, `app/vision/biomechanics.py`)
+-   [ ] Classical asana reference criteria matrix established (`app/vision/criteria.py`)
+-   [ ] Pose Understanding & Correction Agent (`app/agents/pose/agent.py`) operational with 1.5s temporal debounce
 -   [ ] Closed-loop corrective cues dispatched to SpeechAgent via `PostureDeviationEvent`
--   [ ] Unit tests for 3D biomechanics calculations and PoseAgent passing
+-   [ ] Standalone interactive verification CLI runner (`scripts/run_pose_detector.py`) with telemetry HUD (FPS, latency, RAM)
+-   [ ] Unit tests for 3D biomechanics calculations, zero-hallucination assertion, and PoseAgent passing
 
 ## Phase 3C — Fullstack Live Practice Studio UI & Observability Dashboard
 
@@ -3206,13 +3278,24 @@ medical diagnosis or treatment claims.
 -   [ ] CriticAgent reflection loop ablation study completed
 -   [ ] End-to-end latency benchmark with p95 measured against 30-second ceiling
 
-## Phase 5 — Production Deployment, Final Report & Defense Deliverables
+## Phase 5 — Enterprise Containerization & Production Docker Packaging
 
--   [ ] Multi-container Docker Compose production stack operational (`api`, `frontend`, `mcp-server`, `eval-runner`)
--   [ ] Container resource limits, caching, and healthchecks configured
--   [ ] Comprehensive IEEE-style academic final report completed (`docs/FINAL_REPORT.md`)
--   [ ] Presentation slide deck and live demo script completed
--   [ ] Viva defense preparation guide with architectural rationale completed
+-   [ ] Production multi-stage backend Dockerfile (`Dockerfile.backend`) with non-root security user & minimal slim runtime
+-   [ ] Production frontend Dockerfile (`Dockerfile.frontend`) with multi-stage build optimization
+-   [ ] Orchestrated `docker-compose.yml` and `docker-compose.prod.yml` with isolated networks (`api`, `frontend`, `reverse-proxy`)
+-   [ ] Enterprise resource quotas, health checks, and restart policies configured for client host environments
+-   [ ] Persistent volume orchestration for practice memory (`data/memory`), corpus (`data/corpus.json`), and model caches
+-   [ ] Reverse proxy configuration (Nginx) with WebSocket / WebRTC support, CORS, and TLS termination
+-   [ ] Production environment template (`.env.production.example`) with secret masking and strict validation
+-   [ ] Automated container smoke tests and CI verification script (`scripts/docker_smoke_test.sh`)
+-   [ ] Enterprise client deployment guide & runbook (`docs/DEPLOYMENT_GUIDE.md`)
+
+## Phase 6 — Client Handover, Final Technical Report & Defense Deliverables
+
+-   [ ] Comprehensive IEEE-style academic final report & enterprise technical whitepaper completed (`docs/FINAL_REPORT.md`)
+-   [ ] Turnkey Client Handover Package with SLA verification and architectural runbook
+-   [ ] Executive presentation slide deck and live interactive demonstration script completed
+-   [ ] Viva defense & technical review preparation guide with design rationale completed
 
 ------------------------------------------------------------------------
 
