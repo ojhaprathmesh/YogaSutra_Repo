@@ -4,7 +4,6 @@ tests/test_biomechanics.py — Comprehensive Unit Tests for 3D Vector Geometry C
 Phase 3B: Asserts exact mathematical correctness of the pure-Python 3D vector geometry engine.
 Guarantees 0.00° error on known Euclidean geometry coordinates with zero hallucination.
 """
-import math
 import pytest
 
 from app.vision.biomechanics import (

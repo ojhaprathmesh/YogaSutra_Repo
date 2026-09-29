@@ -18,7 +18,7 @@ import inspect
 import logging
 import uuid
 from datetime import datetime, UTC
-from typing import Any, Callable, Coroutine
+from typing import Any, Callable
 
 from pydantic import BaseModel, Field
 

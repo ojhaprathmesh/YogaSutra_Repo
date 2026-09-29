@@ -17,7 +17,7 @@ from app.agents.planner.tot import (
     compute_transition_smoothness,
     generate_plan_candidates,
 )
-from app.state import EvidenceChunk, PoseItem, PracticePlan, UserProfile
+from app.state import EvidenceChunk, PoseItem, UserProfile
 
 
 def generate_plan_candidates_tool(

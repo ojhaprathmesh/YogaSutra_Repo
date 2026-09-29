@@ -64,7 +64,7 @@ def _match_constraint(user_constraint: str, pose_contraindications: list[str]) -
         if u_lower in p_lower or p_lower in u_lower:
             return True
         # Category keyword match
-        for cat, keywords in CONSTRAINT_KEYWORDS.items():
+        for keywords in CONSTRAINT_KEYWORDS.values():
             if any(k in u_lower for k in keywords) and any(k in p_lower for k in keywords):
                 return True
     return False

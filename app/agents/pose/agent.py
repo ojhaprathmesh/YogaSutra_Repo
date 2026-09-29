@@ -21,7 +21,6 @@ from app.vision.criteria import (
     evaluate_pose_against_criteria,
     normalize_asana_name,
 )
-from app.vision.detector import PoseDetector
 from app.workflows.event_driven import PostureDeviationEvent, get_event_bus
 
 logger = logging.getLogger("yogasutra.agents.pose")

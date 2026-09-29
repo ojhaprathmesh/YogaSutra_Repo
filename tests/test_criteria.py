@@ -3,7 +3,6 @@ tests/test_criteria.py — Unit Tests for Classical Asana Criteria Matrix
 
 Phase 3B: Verifies deterministic alignment thresholds and cue mapping across core asanas.
 """
-import pytest
 
 from app.vision.biomechanics import BiomechanicalSnapshot
 from app.vision.criteria import (

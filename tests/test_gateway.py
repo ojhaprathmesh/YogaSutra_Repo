@@ -72,7 +72,7 @@ class TestModelRouter:
 
     def test_router_mock_fallback(self):
         class MockGateway(ModelGateway):
-            def generate(self, prompt, system_instruction="", model=None, provider=None, **kwargs):
+            def generate(self, prompt, system_instruction="", model=None, provider=None, **_kwargs):
                 if provider == "gemini":
                     raise RuntimeError("Gemini 429 quota exhausted")
                 return ModelResponse(

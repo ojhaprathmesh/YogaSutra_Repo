@@ -73,9 +73,13 @@ RIGHT_ANKLE = 28
 # Core Trigonometric Geometry Functions
 # ---------------------------------------------------------------------------
 
-def calculate_angle_3d(a: Point3D, b: Point3D, c: Point3D) -> float:
+def calculate_angle_3d(a: Point3D, b: Point3D, c: Point3D, use_depth: bool = True) -> float:
     """
-    Calculate the interior 3D angle at vertex `b` formed by segments (b -> a) and (b -> c).
+    Calculate the interior angle at vertex `b` formed by segments (b -> a) and (b -> c).
+    
+    When `use_depth=True`, computes Euclidean 3D angle.
+    When `use_depth=False`, projects onto the 2D camera image plane (XY),
+    eliminating monocular depth estimation distortion.
     
     Formula:
         u = a - b
@@ -90,12 +94,12 @@ def calculate_angle_3d(a: Point3D, b: Point3D, c: Point3D) -> float:
     # Vector u = a - b
     ux = a.x - b.x
     uy = a.y - b.y
-    uz = a.z - b.z
+    uz = (a.z - b.z) if use_depth else 0.0
 
     # Vector v = c - b
     vx = c.x - b.x
     vy = c.y - b.y
-    vz = c.z - b.z
+    vz = (c.z - b.z) if use_depth else 0.0
 
     # Dot product
     dot = ux * vx + uy * vy + uz * vz
@@ -114,17 +118,17 @@ def calculate_angle_3d(a: Point3D, b: Point3D, c: Point3D) -> float:
     return math.degrees(math.acos(cosine))
 
 
-def calculate_knee_angle(hip: Point3D, knee: Point3D, ankle: Point3D) -> float:
+def calculate_knee_angle(hip: Point3D, knee: Point3D, ankle: Point3D, use_depth: bool = False) -> float:
     """Calculate the interior knee flexion angle (180.0 = fully extended, 90.0 = right angle)."""
-    return calculate_angle_3d(hip, knee, ankle)
+    return calculate_angle_3d(hip, knee, ankle, use_depth=use_depth)
 
 
-def calculate_elbow_angle(shoulder: Point3D, elbow: Point3D, wrist: Point3D) -> float:
+def calculate_elbow_angle(shoulder: Point3D, elbow: Point3D, wrist: Point3D, use_depth: bool = False) -> float:
     """Calculate the interior elbow flexion angle (180.0 = fully extended, 90.0 = right angle)."""
-    return calculate_angle_3d(shoulder, elbow, wrist)
+    return calculate_angle_3d(shoulder, elbow, wrist, use_depth=use_depth)
 
 
-def calculate_spine_verticality(mid_hip: Point3D, mid_shoulder: Point3D) -> float:
+def calculate_spine_verticality(mid_hip: Point3D, mid_shoulder: Point3D, use_depth: bool = False) -> float:
     """
     Calculate deviation of torso axis (mid_hip -> mid_shoulder) from true vertical (y-axis).
     In standard camera/image coordinates, Y increases downwards, so vertical upward is (0, -1, 0).
@@ -135,7 +139,7 @@ def calculate_spine_verticality(mid_hip: Point3D, mid_shoulder: Point3D) -> floa
     # Torso direction vector from hip to shoulder
     tx = mid_shoulder.x - mid_hip.x
     ty = mid_shoulder.y - mid_hip.y
-    tz = mid_shoulder.z - mid_hip.z
+    tz = (mid_shoulder.z - mid_hip.z) if use_depth else 0.0
 
     torso_mag = math.sqrt(tx * tx + ty * ty + tz * tz)
     if torso_mag < 1e-7:
@@ -150,7 +154,7 @@ def calculate_spine_verticality(mid_hip: Point3D, mid_shoulder: Point3D) -> floa
     return math.degrees(math.acos(cosine))
 
 
-def calculate_shoulder_symmetry(left_shoulder: Point3D, right_shoulder: Point3D) -> float:
+def calculate_shoulder_symmetry(left_shoulder: Point3D, right_shoulder: Point3D, use_depth: bool = False) -> float:
     """
     Calculate incline angle of the line connecting shoulders relative to horizontal floor.
     0.0 deg = perfectly level/horizontal shoulders
@@ -158,7 +162,7 @@ def calculate_shoulder_symmetry(left_shoulder: Point3D, right_shoulder: Point3D)
     """
     dx = right_shoulder.x - left_shoulder.x
     dy = right_shoulder.y - left_shoulder.y
-    dz = right_shoulder.z - left_shoulder.z
+    dz = (right_shoulder.z - left_shoulder.z) if use_depth else 0.0
 
     span_mag = math.sqrt(dx * dx + dy * dy + dz * dz)
     if span_mag < 1e-7:
@@ -175,7 +179,7 @@ def calculate_shoulder_symmetry(left_shoulder: Point3D, right_shoulder: Point3D)
     return math.degrees(math.acos(cosine))
 
 
-def calculate_hip_symmetry(left_hip: Point3D, right_hip: Point3D) -> float:
+def calculate_hip_symmetry(left_hip: Point3D, right_hip: Point3D, use_depth: bool = False) -> float:
     """
     Calculate incline angle of the line connecting hips relative to horizontal floor.
     0.0 deg = perfectly level hips
@@ -183,7 +187,7 @@ def calculate_hip_symmetry(left_hip: Point3D, right_hip: Point3D) -> float:
     """
     dx = right_hip.x - left_hip.x
     dy = right_hip.y - left_hip.y
-    dz = right_hip.z - left_hip.z
+    dz = (right_hip.z - left_hip.z) if use_depth else 0.0
 
     span_mag = math.sqrt(dx * dx + dy * dy + dz * dz)
     if span_mag < 1e-7:
@@ -213,11 +217,13 @@ def midpoint(p1: Point3D, p2: Point3D) -> Point3D:
 # ---------------------------------------------------------------------------
 
 def extract_biomechanics_from_landmarks(
-    landmarks: Mapping[int, Point3D]
+    landmarks: Mapping[int, Point3D],
+    use_depth: bool = False,
 ) -> BiomechanicalSnapshot:
     """
     Extract all vital joint angles and anatomical symmetries from a 33-point landmark map.
-    Gracefully defaults missing landmarks without raising exceptions.
+    Defaults to 2D camera projection (`use_depth=False`) for monocular camera/webcam feeds,
+    preventing uncalibrated pseudo-depth distortion.
     Turnaround time: < 0.1 ms.
     """
     snapshot = BiomechanicalSnapshot(landmarks=dict(landmarks))
@@ -225,23 +231,23 @@ def extract_biomechanics_from_landmarks(
     # Knee flexion
     if LEFT_HIP in landmarks and LEFT_KNEE in landmarks and LEFT_ANKLE in landmarks:
         snapshot.left_knee_angle = calculate_knee_angle(
-            landmarks[LEFT_HIP], landmarks[LEFT_KNEE], landmarks[LEFT_ANKLE]
+            landmarks[LEFT_HIP], landmarks[LEFT_KNEE], landmarks[LEFT_ANKLE], use_depth=use_depth
         )
 
     if RIGHT_HIP in landmarks and RIGHT_KNEE in landmarks and RIGHT_ANKLE in landmarks:
         snapshot.right_knee_angle = calculate_knee_angle(
-            landmarks[RIGHT_HIP], landmarks[RIGHT_KNEE], landmarks[RIGHT_ANKLE]
+            landmarks[RIGHT_HIP], landmarks[RIGHT_KNEE], landmarks[RIGHT_ANKLE], use_depth=use_depth
         )
 
     # Elbow flexion
     if LEFT_SHOULDER in landmarks and LEFT_ELBOW in landmarks and LEFT_WRIST in landmarks:
         snapshot.left_elbow_angle = calculate_elbow_angle(
-            landmarks[LEFT_SHOULDER], landmarks[LEFT_ELBOW], landmarks[LEFT_WRIST]
+            landmarks[LEFT_SHOULDER], landmarks[LEFT_ELBOW], landmarks[LEFT_WRIST], use_depth=use_depth
         )
 
     if RIGHT_SHOULDER in landmarks and RIGHT_ELBOW in landmarks and RIGHT_WRIST in landmarks:
         snapshot.right_elbow_angle = calculate_elbow_angle(
-            landmarks[RIGHT_SHOULDER], landmarks[RIGHT_ELBOW], landmarks[RIGHT_WRIST]
+            landmarks[RIGHT_SHOULDER], landmarks[RIGHT_ELBOW], landmarks[RIGHT_WRIST], use_depth=use_depth
         )
 
     # Spine verticality
@@ -251,17 +257,17 @@ def extract_biomechanics_from_landmarks(
     ):
         mid_shoulder = midpoint(landmarks[LEFT_SHOULDER], landmarks[RIGHT_SHOULDER])
         mid_hip = midpoint(landmarks[LEFT_HIP], landmarks[RIGHT_HIP])
-        snapshot.spine_verticality_deg = calculate_spine_verticality(mid_hip, mid_shoulder)
+        snapshot.spine_verticality_deg = calculate_spine_verticality(mid_hip, mid_shoulder, use_depth=use_depth)
 
     # Shoulder and Hip symmetry
     if LEFT_SHOULDER in landmarks and RIGHT_SHOULDER in landmarks:
         snapshot.shoulder_level_deg = calculate_shoulder_symmetry(
-            landmarks[LEFT_SHOULDER], landmarks[RIGHT_SHOULDER]
+            landmarks[LEFT_SHOULDER], landmarks[RIGHT_SHOULDER], use_depth=use_depth
         )
 
     if LEFT_HIP in landmarks and RIGHT_HIP in landmarks:
         snapshot.hip_level_deg = calculate_hip_symmetry(
-            landmarks[LEFT_HIP], landmarks[RIGHT_HIP]
+            landmarks[LEFT_HIP], landmarks[RIGHT_HIP], use_depth=use_depth
         )
 
     return snapshot

@@ -3,7 +3,6 @@ tests/test_pose_agent.py — Unit Tests for Pose Understanding & Alignment Agent
 
 Phase 3B: Tests 1.5s temporal debounce filter, closed-loop event emission, and EventBus wiring.
 """
-import pytest
 
 from app.agents.pose.agent import PoseAgent
 from app.vision.biomechanics import BiomechanicalSnapshot

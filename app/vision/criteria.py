@@ -7,7 +7,7 @@ Zero-hallucination guarantee: deviations are strictly rule-derived with exact nu
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Literal
 
 from app.vision.biomechanics import BiomechanicalSnapshot

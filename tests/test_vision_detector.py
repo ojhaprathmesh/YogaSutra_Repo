@@ -4,7 +4,6 @@ tests/test_vision_detector.py — Unit Tests for Vision Frame Ingestion & Pose D
 Phase 3B: Tests 480p ingestion clamping, MediaPipe landmark extraction, and skeleton rendering.
 """
 import numpy as np
-import pytest
 
 from app.vision.biomechanics import BiomechanicalSnapshot, Point3D, LEFT_KNEE, RIGHT_KNEE
 from app.vision.criteria import PostureDeviation

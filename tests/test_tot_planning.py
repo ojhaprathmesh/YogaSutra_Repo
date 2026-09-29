@@ -8,11 +8,10 @@ from app.agents.planner.tot import (
     compute_evidence_grounding,
     compute_safety_score,
     compute_transition_smoothness,
-    evaluate_candidate_plan,
     generate_plan_candidates,
     select_best_candidate,
 )
-from app.state import EvidenceChunk, PoseItem, PracticePlan, UserProfile
+from app.state import EvidenceChunk, PoseItem, UserProfile
 from app.tools.planning import evaluate_candidate_plan_tool, generate_plan_candidates_tool
 
 

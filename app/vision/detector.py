@@ -15,8 +15,6 @@ import queue
 import threading
 import time
 import urllib.request
-from typing import Mapping
-
 import cv2
 import numpy as np
 
@@ -24,7 +22,6 @@ from app.vision.biomechanics import (
     Point3D,
     BiomechanicalSnapshot,
     extract_biomechanics_from_landmarks,
-    NOSE,
     LEFT_SHOULDER,
     RIGHT_SHOULDER,
     LEFT_ELBOW,
@@ -103,7 +100,6 @@ class PoseDetector:
     def _init_landmarker(self) -> None:
         """Initialize MediaPipe PoseLandmarker in synchronous Image mode."""
         try:
-            import mediapipe as mp
             from mediapipe.tasks.python import BaseOptions
             from mediapipe.tasks.python.vision import (
                 PoseLandmarker,
@@ -175,12 +171,15 @@ class PoseDetector:
 
         return landmarks_dict
 
-    def extract_biomechanics(self, frame: np.ndarray) -> BiomechanicalSnapshot:
-        """Process frame and return calculated joint angles and spatial alignments."""
+    def extract_biomechanics(self, frame: np.ndarray, use_depth: bool = False) -> BiomechanicalSnapshot:
+        """
+        Process frame and return calculated joint angles and spatial alignments.
+        Defaults to 2D projection plane (use_depth=False) to avoid monocular depth distortion.
+        """
         landmarks = self.extract_landmarks(frame)
         if not landmarks:
             return BiomechanicalSnapshot()
-        return extract_biomechanics_from_landmarks(landmarks)
+        return extract_biomechanics_from_landmarks(landmarks, use_depth=use_depth)
 
     def draw_skeleton(
         self,

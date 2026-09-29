@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, date, timedelta, UTC
+from datetime import datetime, date, UTC
 from pathlib import Path
 from typing import Any
 
