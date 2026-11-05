@@ -8,6 +8,8 @@ Provides REST and Static UI endpoints for:
 4. Audio File Serving from `data/audio_cache/`.
 5. Execution Trace and MCP Tool Inspection.
 6. Interactive Hands-Free Practice Studio Web App.
+7. Security Guardrails — input validation and prompt-injection protection (§8).
+8. Prompt Strategy Variants — ReAct, Few-Shot, CoT via /api/practice/generate (§8).
 """
 from __future__ import annotations
 
@@ -27,6 +29,9 @@ from app.audio.stt import stt_adapter
 from app.mcp.server import mcp_server
 from app.models.gateway import model_gateway
 from app.runner import run_yogasutra
+from app.security.guardrails import GuardrailResult, run_input_guardrails
+from app.security.callbacks import validate_tool_return, validate_state_transition
+from app.prompts.factory import PromptStrategy, build_agent_instruction, build_variant_agents
 
 logger = logging.getLogger("yogasutra.api")
 
@@ -60,6 +65,7 @@ class PracticeRequest(BaseModel):
     persona_id: str = "P00"
     phase: int = 2
     preferred_provider: str | None = None
+    prompt_strategy: str = "default"   # "react" | "few_shot" | "cot" | "default"
 
 
 class SynthesisRequest(BaseModel):
@@ -104,18 +110,54 @@ def get_model_status() -> dict[str, Any]:
 
 @app.post("/api/practice/generate")
 def generate_practice(req: PracticeRequest) -> dict[str, Any]:
-    """Runs the multi-agent pipeline and returns the practice plan and execution trace."""
+    """Runs the multi-agent pipeline and returns the practice plan and execution trace.
+
+    Security:
+      - Passes user_input through the guardrail engine BEFORE the pipeline starts.
+      - Logs any guardrail violations as SafetyEscalationEvents.
+    Prompt Variances:
+      - Accepts prompt_strategy: "react" | "few_shot" | "cot" | "default".
+      - The strategy is recorded in the trace for evaluation comparisons.
+    """
+    # ── Layer 1: Input Guardrail ──────────────────────────────────────────
+    guard = run_input_guardrails(req.user_input)
+    if not guard.is_safe:
+        # Log violation to event bus for observability
+        try:
+            from app.workflows.event_driven import SafetyEscalationEvent, get_event_bus
+            bus = get_event_bus()
+            bus.publish_sync(SafetyEscalationEvent(
+                session_id="pre-pipeline",
+                user_id=req.persona_id,
+                severity="medium" if guard.risk_score < 0.9 else "critical",
+                trigger_condition=f"Input guardrail violation: {guard.violations}",
+                action_required="halt_practice",
+            ))
+        except Exception:
+            pass
+        logger.warning("[API] Guardrail blocked request. violations=%s", guard.violations)
+        raise HTTPException(status_code=400, detail=guard.rejection_reason)
+
+    # ── Layer 2: Resolve Prompt Strategy ──────────────────────────────────
+    try:
+        strategy = PromptStrategy(req.prompt_strategy)
+    except ValueError:
+        strategy = PromptStrategy.DEFAULT
+
     try:
         result = run_yogasutra(
-            user_input=req.user_input,
+            user_input=guard.sanitized_input,
             persona_id=req.persona_id,
             phase=req.phase,
+            prompt_strategy=strategy,
         )
         return {
             "run_id": result.run_id,
             "session_id": result.session_id,
             "final_response": result.final_response,
             "phase": result.phase,
+            "prompt_strategy": strategy.value,
+            "guardrail": guard.to_dict(),
             "trace": result.trace.to_dict(),
         }
     except Exception as e:
@@ -316,6 +358,71 @@ def generate_candidates_endpoint(req: CandidateGenerationRequest) -> list[dict[s
         intensity=req.intensity,
         constraints=req.constraints,
     )
+
+
+# ---------------------------------------------------------------------------
+# Security & Prompt Variant Endpoints (§8)
+# ---------------------------------------------------------------------------
+
+class SecurityValidateRequest(BaseModel):
+    user_input: str
+
+
+@app.post("/api/security/validate")
+def security_validate(req: SecurityValidateRequest) -> dict[str, Any]:
+    """
+    Inspect a user input string through the guardrail pipeline without
+    running the full multi-agent system. Returns a GuardrailResult.
+
+    Useful for the Studio UI to show a live safety indicator before submission.
+    """
+    result = run_input_guardrails(req.user_input)
+    return result.to_dict()
+
+
+class PromptVariantsRequest(BaseModel):
+    persona_id: str = "P00"
+
+
+@app.post("/api/prompts/variants")
+def get_prompt_variants(req: PromptVariantsRequest) -> dict[str, str]:
+    """
+    Return all three architectural prompt variants (ReAct, Few-Shot, CoT)
+    for the PlannerAgent, parameterised by persona_id.
+
+    Used by the evaluation benchmark to run side-by-side architecture comparisons.
+    """
+    return build_variant_agents(persona_id=req.persona_id)
+
+
+@app.get("/api/prompts/strategies")
+def list_prompt_strategies() -> list[dict[str, str]]:
+    """List the available prompt strategy variants with descriptions."""
+    return [
+        {
+            "value": "default",
+            "label": "Default / Chain-of-Thought",
+            "description": "Production prompt. Structured CoT-style output directly to JSON.",
+        },
+        {
+            "value": "react",
+            "label": "ReAct (Reason + Act)",
+            "description": "Explicit Thought → Action → Observation cycle over tool calls. "
+                           "Best for transparency and tool-heavy agents.",
+        },
+        {
+            "value": "few_shot",
+            "label": "Few-Shot In-Context",
+            "description": "In-context exemplars of reference input/output pairs. "
+                           "Best for structured output reliability.",
+        },
+        {
+            "value": "cot",
+            "label": "Chain-of-Thought (Explicit)",
+            "description": "Narrates reasoning inside <thinking> tags before final answer. "
+                           "Balances latency vs interpretability.",
+        },
+    ]
 
 
 # ---------------------------------------------------------------------------

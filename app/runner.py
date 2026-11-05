@@ -82,6 +82,7 @@ def run_yogasutra(
     on_agent_start: Any | None = None,
     on_agent_done: Any | None = None,
     on_agent_error: Any | None = None,
+    prompt_strategy: "Any | None" = None,
 ) -> YogaSutraResult:
     """
     Run the YogaSutra multi-agent pipeline for a given user input.
@@ -93,6 +94,10 @@ def run_yogasutra(
         on_agent_start:  Optional callback(agent_name: str) fired when an agent begins.
         on_agent_done:   Optional callback(agent_name: str) fired when an agent completes.
         on_agent_error:  Optional callback(agent_name: str, msg: str) fired on error.
+        prompt_strategy: Optional PromptStrategy variant (react/few_shot/cot/default).
+                         When provided, the initial session state records the strategy
+                         for evaluation tracing. The agent instructions themselves are
+                         selected via the PromptFactory.
 
     Returns:
         YogaSutraResult with final_response, session_state, and trace.
@@ -123,6 +128,7 @@ def run_yogasutra(
         "persona_id": persona_id,
         "user_input": user_input,
         "phase": phase,
+        "prompt_strategy": prompt_strategy.value if prompt_strategy is not None else "default",
     }
 
     asyncio.run(
