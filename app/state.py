@@ -157,6 +157,10 @@ class YogaSessionState(BaseModel):
     selected_candidate_index: int = 0
     event_journal: list[dict[str, Any]] = Field(default_factory=list)
 
+    # Requirements 6 & 7: A2A Protocol & CrewAI Cross-Framework Audit fields
+    crewai_audit: dict[str, Any] = Field(default_factory=dict)
+    a2a_messages: list[dict[str, Any]] = Field(default_factory=list)
+
     # Final
     final_response: str | None = None
 

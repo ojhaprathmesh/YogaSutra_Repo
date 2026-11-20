@@ -13,14 +13,19 @@ from the candidate_plan stored in session state.
 from __future__ import annotations
 
 import os
+from typing import Any
 
 from google.adk.agents import LlmAgent, SequentialAgent
 
+from app.a2a.bridge import A2ABridge, get_a2a_bridge
+from app.a2a.protocol import FrameworkType, Performative
+from app.agents.crewai.audit_agent import CrewAIAuditAgent, register_crewai_audit_agent
 from app.agents.critic.agent import critic_agent
 from app.agents.knowledge.agent import knowledge_agent
 from app.agents.planner.agent import planner_agent
 from app.agents.profile.agent import profile_agent
 from app.agents.safety.agent import safety_agent
+from app.workflows.blackboard import Blackboard
 
 _MODEL = os.environ.get("YOGASUTRA_MODEL", "gemini-3.5-flash-lite")
 
@@ -108,4 +113,87 @@ phase2_root_agent = SequentialAgent(
 
 # Default root agent alias (Phase 2)
 root_agent = phase2_root_agent
+
+
+# ---------------------------------------------------------------------------
+# Requirements 6 & 7: ADK <-> CrewAI A2A Handoff & Tool Integration
+# ---------------------------------------------------------------------------
+
+
+def _ensure_crewai_registered(bridge: A2ABridge) -> None:
+    """Ensure CrewAIAuditAgent is registered on the given A2ABridge."""
+    if not bridge.has_agent(CrewAIAuditAgent.AGENT_NAME):
+        register_crewai_audit_agent(bridge=bridge)
+
+
+def request_crewai_audit(
+    candidate_plan: dict[str, Any],
+    user_profile: dict[str, Any],
+    validation_results: dict[str, Any] | None = None,
+    conversation_id: str | None = None,
+) -> dict[str, Any]:
+    """
+    ADK-callable tool that sends an A2A AUDIT request to the CrewAI specialist
+    (`CrewAIAuditAgent`) and returns the structured audit payload.
+    """
+    bridge = get_a2a_bridge()
+    _ensure_crewai_registered(bridge)
+    _, reply = bridge.send_and_update_blackboard(
+        sender_agent="RootAgent",
+        sender_framework=FrameworkType.ADK,
+        recipient_agent=CrewAIAuditAgent.AGENT_NAME,
+        recipient_framework=FrameworkType.CREWAI,
+        performative=Performative.AUDIT,
+        payload={
+            "candidate_plan": candidate_plan,
+            "user_profile": user_profile,
+            "validation_results": validation_results or {},
+        },
+        conversation_id=conversation_id,
+    )
+    return reply.payload
+
+
+def run_adk_to_crewai_handoff(
+    session_state: dict[str, Any],
+    blackboard: Blackboard | None = None,
+    bridge: A2ABridge | None = None,
+    sender_agent: str = "CriticAgent",
+    conversation_id: str | None = None,
+) -> dict[str, Any]:
+    """
+    Execute an A2A cross-framework handoff from an ADK agent to CrewAIAuditAgent
+    and persist both the audit result (`crewai_audit`) and A2A message envelopes
+    (`a2a_messages`) into the shared Blackboard and ADK session state.
+    """
+    active_bridge = bridge if bridge is not None else get_a2a_bridge()
+    _ensure_crewai_registered(active_bridge)
+
+    active_bb = blackboard if blackboard is not None else Blackboard(initial_state=session_state)
+    conv_id = conversation_id or str(session_state.get("run_id") or "")
+
+    request_msg, response_msg = active_bridge.send_and_update_blackboard(
+        sender_agent=sender_agent,
+        sender_framework=FrameworkType.ADK,
+        recipient_agent=CrewAIAuditAgent.AGENT_NAME,
+        recipient_framework=FrameworkType.CREWAI,
+        performative=Performative.AUDIT,
+        payload={
+            "candidate_plan": session_state.get("candidate_plan", {}),
+            "user_profile": session_state.get("user_profile", {}),
+            "validation_results": session_state.get("validation_results", {}),
+        },
+        blackboard=active_bb,
+        session_state=session_state,
+        state_channel="crewai_audit",
+        conversation_id=conv_id or None,
+    )
+
+    return {
+        "request": request_msg.to_dict(),
+        "response": response_msg.to_dict(),
+        "crewai_audit": response_msg.payload,
+        "blackboard": active_bb.to_dict(),
+    }
+
 

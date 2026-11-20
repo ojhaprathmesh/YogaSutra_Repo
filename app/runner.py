@@ -40,8 +40,13 @@ from dotenv import load_dotenv
 from google.adk.runners import InMemoryRunner
 from google.genai import types as genai_types
 
-from app.agents.root.agent import phase1_root_agent, phase2_root_agent
+from app.agents.root.agent import (
+    phase1_root_agent,
+    phase2_root_agent,
+    run_adk_to_crewai_handoff,
+)
 from app.tracing.trace import ExecutionTrace
+from app.workflows.blackboard import Blackboard
 from app.workflows.event_driven import (
     SafetyEscalationEvent,
     SessionCompletedEvent,
@@ -75,6 +80,25 @@ class YogaSutraResult:
 # ---------------------------------------------------------------------------
 
 
+def execute_a2a_crewai_audit(
+    session_state: dict[str, Any],
+    blackboard: Blackboard | None = None,
+    bridge: Any | None = None,
+    conversation_id: str | None = None,
+) -> dict[str, Any]:
+    """
+    Execute the ADK -> CrewAI A2A audit handoff on an existing session state
+    and write the results into the shared Blackboard.
+    """
+    return run_adk_to_crewai_handoff(
+        session_state=session_state,
+        blackboard=blackboard,
+        bridge=bridge,
+        sender_agent="CriticAgent",
+        conversation_id=conversation_id,
+    )
+
+
 def run_yogasutra(
     user_input: str,
     persona_id: str = "P00",
@@ -83,6 +107,7 @@ def run_yogasutra(
     on_agent_done: Any | None = None,
     on_agent_error: Any | None = None,
     prompt_strategy: "Any | None" = None,
+    enable_crewai_audit: bool = True,
 ) -> YogaSutraResult:
     """
     Run the YogaSutra multi-agent pipeline for a given user input.
@@ -274,6 +299,26 @@ def run_yogasutra(
         "validation_results": "SafetyAgent",
         "critique": "CriticAgent",
     }
+
+    # Requirements 6 & 7: Cross-framework A2A handoff (ADK -> CrewAI)
+    if enable_crewai_audit and phase >= 2 and session_state.get("candidate_plan"):
+        try:
+            blackboard = Blackboard(initial_state=session_state)
+            t_a2a = time.monotonic()
+            execute_a2a_crewai_audit(
+                session_state=session_state,
+                blackboard=blackboard,
+                conversation_id=run_id,
+            )
+            a2a_ms = (time.monotonic() - t_a2a) * 1000
+            trace.record_agent(agent_name="CrewAIAuditAgent", latency_ms=a2a_ms)
+            state_agent_map["crewai_audit"] = "CrewAIAuditAgent"
+            state_agent_map["a2a_messages"] = "A2ABridge"
+        except Exception as exc:  # noqa: BLE001
+            logging.getLogger("yogasutra.runner").debug(
+                "Non-fatal CrewAI A2A audit notice: %s", exc
+            )
+
     for key, writer_agent in state_agent_map.items():
         if session_state.get(key):
             trace.record_state_change(

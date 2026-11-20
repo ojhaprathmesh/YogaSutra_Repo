@@ -32,6 +32,7 @@ from app.runner import run_yogasutra
 from app.security.guardrails import GuardrailResult, run_input_guardrails
 from app.security.callbacks import validate_tool_return, validate_state_transition
 from app.prompts.factory import PromptStrategy, build_agent_instruction, build_variant_agents
+from app.ui.dashboard import collect_dashboard_stats, record_guardrail_audit, render_dashboard_html
 
 logger = logging.getLogger("yogasutra.api")
 
@@ -122,8 +123,14 @@ def generate_practice(req: PracticeRequest) -> dict[str, Any]:
     # ── Layer 1: Input Guardrail ──────────────────────────────────────────
     guard = run_input_guardrails(req.user_input)
     if not guard.is_safe:
-        # Log violation to event bus for observability
+        # Log violation to event bus for observability and audit trail
         try:
+            record_guardrail_audit(
+                input_text=req.user_input,
+                violations=[v.value for v in guard.violations],
+                risk_score=guard.risk_score,
+                status="BLOCKED",
+            )
             from app.workflows.event_driven import SafetyEscalationEvent, get_event_bus
             bus = get_event_bus()
             bus.publish_sync(SafetyEscalationEvent(
@@ -423,6 +430,22 @@ def list_prompt_strategies() -> list[dict[str, str]]:
                            "Balances latency vs interpretability.",
         },
     ]
+
+
+# ---------------------------------------------------------------------------
+# Phase 3C: Observability & Trace Analytics Dashboard Endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/api/dashboard/stats")
+def get_dashboard_stats_endpoint() -> dict[str, Any]:
+    """Retrieve aggregated observability statistics, latencies, tokens, and event bus data."""
+    return collect_dashboard_stats()
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+def serve_dashboard() -> HTMLResponse:
+    """Serve interactive Observability & Trace Analytics Dashboard."""
+    return HTMLResponse(content=render_dashboard_html())
 
 
 # ---------------------------------------------------------------------------

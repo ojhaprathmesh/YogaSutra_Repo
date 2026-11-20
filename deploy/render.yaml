@@ -1,0 +1,31 @@
+# ==============================================================================
+# Render.com Blueprint Specification for YogaSutra
+# ==============================================================================
+# Deploys the unified multi-agent web studio and API as a managed web service
+# ==============================================================================
+
+services:
+  - type: web
+    name: yogasutra-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: starter
+    region: oregon
+    numInstances: 1
+    healthCheckPath: /api/health
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: YOGASUTRA_MODEL
+        value: gemini-2.5-flash
+      - key: YOGASUTRA_LOG_LEVEL
+        value: INFO
+      - key: GOOGLE_API_KEY
+        sync: false # Set securely in Render Dashboard
+      - key: NVIDIA_API_KEY
+        sync: false # Set securely in Render Dashboard (optional)
+      - key: ELEVENLABS_API_KEY
+        sync: false # Set securely in Render Dashboard (optional)
+      - key: ENABLE_GUARDRAILS
+        value: "true"

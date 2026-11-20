@@ -6,7 +6,7 @@
   <title>YogaSutra — AI Multi-Agent Practice Studio</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     :root {
       --bg: #090b10;
@@ -15,9 +15,13 @@
       --primary: #8b5cf6;
       --primary-hover: #7c3aed;
       --accent: #10b981;
+      --accent-warn: #f59e0b;
+      --accent-danger: #ef4444;
+      --accent-cyan: #06b6d4;
       --text: #f3f4f6;
       --text-muted: #9ca3af;
       --glow: rgba(139, 92, 246, 0.25);
+      --font-mono: 'JetBrains Mono', monospace;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -30,8 +34,8 @@
     }
     header {
       border-bottom: 1px solid var(--card-border);
-      background: rgba(9, 11, 16, 0.8);
-      backdrop-filter: blur(12px);
+      background: rgba(9, 11, 16, 0.85);
+      backdrop-filter: blur(14px);
       padding: 1rem 2rem;
       display: flex;
       justify-content: space-between;
@@ -39,6 +43,8 @@
       position: sticky;
       top: 0;
       z-index: 50;
+      flex-wrap: wrap;
+      gap: 1rem;
     }
     .brand {
       display: flex;
@@ -50,6 +56,12 @@
       background: linear-gradient(135deg, #a78bfa 0%, #ec4899 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
+    }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
     }
     .badge-bar { display: flex; gap: 0.5rem; flex-wrap: wrap; }
     .badge {
@@ -64,19 +76,45 @@
       border: 1px solid var(--card-border);
     }
     .badge.active { background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.4); color: #34d399; }
-    .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: #10b981; }
+    .badge.warn { background: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.4); color: #fbbf24; }
+    .badge.danger { background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.4); color: #f87171; }
+    .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+    .btn-dashboard-link {
+      padding: 0.4rem 0.85rem;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-decoration: none;
+      color: #fff;
+      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+      box-shadow: 0 2px 10px rgba(99, 102, 241, 0.3);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: all 0.2s;
+    }
+    .btn-dashboard-link:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(99, 102, 241, 0.45); }
 
     main {
       flex: 1;
-      max-width: 1200px;
+      max-width: 1350px;
       margin: 0 auto;
       width: 100%;
       padding: 2rem 1.5rem;
-      display: grid;
-      grid-template-columns: 1fr 1.3fr;
+      display: flex;
+      flex-direction: column;
       gap: 2rem;
     }
-    @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+
+    .studio-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 1.3fr;
+      gap: 2rem;
+    }
+    @media (max-width: 950px) {
+      .studio-grid { grid-template-columns: 1fr; }
+    }
 
     .card {
       background: var(--card-bg);
@@ -93,12 +131,12 @@
       margin-bottom: 1rem;
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      justify-content: space-between;
     }
     .input-area { display: flex; flex-direction: column; gap: 1rem; }
     textarea {
       width: 100%;
-      height: 120px;
+      height: 110px;
       background: rgba(0, 0, 0, 0.3);
       border: 1px solid var(--card-border);
       border-radius: 12px;
@@ -111,6 +149,69 @@
       transition: border-color 0.2s;
     }
     textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 2px var(--glow); }
+
+    /* Security Guardrail Bar */
+    .guardrail-status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.5rem 0.85rem;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      font-size: 0.78rem;
+    }
+    .guardrail-indicator {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-weight: 600;
+    }
+
+    /* Strategy Selector */
+    .strategy-section {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    .strategy-label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .strategy-chips {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .strategy-chip {
+      padding: 0.45rem 0.75rem;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .strategy-chip:hover {
+      background: rgba(255, 255, 255, 0.09);
+      color: #fff;
+    }
+    .strategy-chip.active {
+      background: rgba(139, 92, 246, 0.2);
+      border-color: #8b5cf6;
+      color: #c4b5fd;
+      font-weight: 600;
+    }
+    .strategy-desc {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-style: italic;
+    }
 
     .controls-row {
       display: flex;
@@ -152,7 +253,7 @@
     .plan-output {
       line-height: 1.6;
       font-size: 0.92rem;
-      max-height: 650px;
+      max-height: 520px;
       overflow-y: auto;
       padding-right: 0.5rem;
     }
@@ -164,7 +265,7 @@
     .plan-output hr { border: none; border-top: 1px solid var(--card-border); margin: 1rem 0; }
 
     .audio-player-bar {
-      margin-top: 1rem;
+      margin-top: 0.5rem;
       padding: 0.85rem;
       background: rgba(0, 0, 0, 0.25);
       border-radius: 12px;
@@ -178,7 +279,7 @@
     .trace-pills {
       display: flex;
       gap: 0.5rem;
-      margin-top: 1rem;
+      margin-top: 0.5rem;
       flex-wrap: wrap;
     }
     .trace-pill {
@@ -189,6 +290,117 @@
       border: 1px solid var(--card-border);
       color: var(--text-muted);
     }
+
+    /* Biomechanics HUD Section (Phase 3B) */
+    .hud-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+    .hud-layout {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 1.5rem;
+      align-items: center;
+    }
+    @media (max-width: 850px) {
+      .hud-layout { grid-template-columns: 1fr; }
+    }
+    .canvas-wrapper {
+      position: relative;
+      background: #06080d;
+      border: 1px solid rgba(139, 92, 246, 0.25);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.8), 0 0 20px rgba(139, 92, 246, 0.1);
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 320px;
+    }
+    .hud-overlay-tag {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      padding: 0.3rem 0.6rem;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #38bdf8;
+    }
+    .hud-status-badge {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.35rem 0.75rem;
+      border-radius: 6px;
+      background: rgba(16, 185, 129, 0.2);
+      border: 1px solid #10b981;
+      color: #34d399;
+    }
+    .hud-fps-badge {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      background: rgba(0,0,0,0.6);
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+    }
+
+    .telemetry-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .metric-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.82rem;
+      padding: 0.5rem 0.75rem;
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 8px;
+      border: 1px solid var(--card-border);
+    }
+    .metric-label { color: var(--text-muted); }
+    .metric-val { font-family: var(--font-mono); font-weight: 600; color: #fff; }
+    .metric-val.ok { color: #34d399; }
+    .metric-val.warn { color: #f59e0b; }
+
+    .hud-buttons {
+      display: flex;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+      margin-top: 0.5rem;
+    }
+    .btn-hud {
+      padding: 0.5rem 0.9rem;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--card-border);
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      transition: all 0.2s;
+    }
+    .btn-hud:hover { background: rgba(255, 255, 255, 0.12); }
+    .btn-hud.alert-btn {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: rgba(245, 158, 11, 0.4);
+      color: #fbbf24;
+    }
   </style>
 </head>
 <body>
@@ -196,49 +408,144 @@
     <div class="brand">
       <span>🧘</span> YogaSutra Studio
     </div>
-    <div class="badge-bar" id="providerBar">
-      <div class="badge active"><span class="badge-dot"></span> Google Gemini Free</div>
-      <div class="badge active"><span class="badge-dot"></span> Ollama Cloud 120B</div>
-      <div class="badge active"><span class="badge-dot"></span> NVIDIA NIM</div>
-      <div class="badge active"><span class="badge-dot"></span> ElevenLabs Voice</div>
+
+    <div class="header-right">
+      <div class="badge-bar" id="providerBar">
+        <div class="badge active"><span class="badge-dot"></span> Gemini Free</div>
+        <div class="badge active"><span class="badge-dot"></span> Ollama 120B</div>
+        <div class="badge active"><span class="badge-dot"></span> NVIDIA NIM</div>
+        <div class="badge active"><span class="badge-dot"></span> ElevenLabs</div>
+      </div>
+
+      <div class="badge active" id="securityBadge">
+        <span class="badge-dot"></span> <span id="securityBadgeText">Guardrail: Active & Safe</span>
+      </div>
+
+      <a href="/dashboard" class="btn-dashboard-link">
+        <span>📊</span> Observability Dashboard
+      </a>
     </div>
   </header>
 
   <main>
-    <section class="card">
-      <h2>✨ Your Yoga Practice Request</h2>
-      <div class="input-area">
-        <textarea id="userInput" placeholder="Speak or describe your practice... e.g. I am a beginner with 20 minutes in the morning. I want a relaxing yoga practice.">I am a beginner and have 20 minutes in the morning. I want a relaxing yoga practice.</textarea>
+    <div class="studio-grid">
+      <!-- Left Column: Request & Controls -->
+      <section class="card">
+        <h2>
+          <span>✨ Your Yoga Practice Request</span>
+          <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">Phase 2 MAS</span>
+        </h2>
+        <div class="input-area">
+          <textarea id="userInput" oninput="debounceSecurityCheck()" placeholder="Speak or describe your practice... e.g. I am a beginner with 20 minutes in the morning. I want a relaxing yoga practice.">I am a beginner and have 20 minutes in the morning. I want a relaxing yoga practice.</textarea>
 
-        <div class="controls-row">
-          <button id="voiceBtn" class="btn btn-voice" onclick="toggleVoiceInput()">
-            <span id="voiceIcon">🎙️</span> Speak Prompt
-          </button>
-          <button id="generateBtn" class="btn btn-primary" onclick="generatePractice()">
-            <span>🧘</span> Generate Practice
-          </button>
-        </div>
-
-        <div class="audio-player-bar" id="audioPlayerBar" style="display: none;">
-          <div>
-            <div class="voice-tag">🎙️ Spoken Practice Guidance</div>
-            <div id="audioCueText" style="font-size: 0.8rem; color: var(--text-muted);">Ready</div>
+          <!-- Live Input Guardrail Assessment -->
+          <div class="guardrail-status-bar" id="guardrailBar">
+            <div class="guardrail-indicator" id="guardrailIndicator">
+              <span style="color: #10b981;">🛡️</span>
+              <span id="guardrailText">Input Safety: Clean & Verified</span>
+            </div>
+            <div id="riskScoreBadge" style="font-family: var(--font-mono); color: var(--text-muted);">Risk: 0.00</div>
           </div>
-          <button class="btn btn-primary" id="playAudioBtn" onclick="playCurrentCue()">▶ Play Voice</button>
+
+          <!-- Prompt Strategy Architecture Selector -->
+          <div class="strategy-section">
+            <div class="strategy-label">Prompt Strategy Variant</div>
+            <div class="strategy-chips" id="strategyChips">
+              <div class="strategy-chip active" data-strategy="default" onclick="selectStrategy('default')">Default (Direct CoT)</div>
+              <div class="strategy-chip" data-strategy="react" onclick="selectStrategy('react')">ReAct (Reason + Act)</div>
+              <div class="strategy-chip" data-strategy="few_shot" onclick="selectStrategy('few_shot')">Few-Shot In-Context</div>
+              <div class="strategy-chip" data-strategy="cot" onclick="selectStrategy('cot')">Chain-of-Thought (Explicit)</div>
+            </div>
+            <div class="strategy-desc" id="strategyDesc">
+              Production default. Direct structured schema generation with internal reasoning.
+            </div>
+          </div>
+
+          <div class="controls-row">
+            <button id="voiceBtn" class="btn btn-voice" onclick="toggleVoiceInput()">
+              <span id="voiceIcon">🎙️</span> Speak Prompt
+            </button>
+            <button id="generateBtn" class="btn btn-primary" onclick="generatePractice()">
+              <span>🧘</span> Generate Practice
+            </button>
+          </div>
+
+          <div class="audio-player-bar" id="audioPlayerBar" style="display: none;">
+            <div>
+              <div class="voice-tag">🎙️ Spoken Practice Guidance</div>
+              <div id="audioCueText" style="font-size: 0.8rem; color: var(--text-muted);">Ready</div>
+            </div>
+            <button class="btn btn-primary" id="playAudioBtn" onclick="playCurrentCue()">▶ Play Voice</button>
+          </div>
+
+          <div class="trace-pills" id="tracePills">
+            <div class="trace-pill" id="pillStrategy">Strategy: Default</div>
+            <div class="trace-pill">Rate Limiting: Token Bucket Active</div>
+            <div class="trace-pill">Zero Cost Free Tier</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Plan Output -->
+      <section class="card">
+        <h2>
+          <span>📋 Personalized Practice Plan & Trace</span>
+          <span id="planStatusTag" style="font-size: 0.72rem; color: #a78bfa; font-weight: normal;">Ready</span>
+        </h2>
+        <div class="plan-output" id="planOutput">
+          <p style="color: var(--text-muted);">Your personalized yoga sequence will appear here once generated...</p>
+        </div>
+      </section>
+    </div>
+
+    <!-- Phase 3B Biomechanics Video HUD Wireframe Section -->
+    <section class="hud-card">
+      <h2>
+        <span>📹 Real-Time Biomechanics HUD (Phase 3B Vision Skeleton)</span>
+        <span style="font-size: 0.75rem; color: #38bdf8; font-weight: normal;">OpenCV / MediaPipe Mock HUD</span>
+      </h2>
+      <div class="hud-layout">
+        <div class="canvas-wrapper">
+          <canvas id="skeletonCanvas" width="640" height="340"></canvas>
+          <div class="hud-overlay-tag">CAMERA 01 • 1080p @ 30FPS</div>
+          <div class="hud-status-badge" id="hudStatusBadge">🟢 VIRABHADRASANA II • OPTIMAL ALIGNMENT</div>
+          <div class="hud-fps-badge" id="hudFpsBadge">Latency: 14.2ms | Conf: 98.4%</div>
         </div>
 
-        <div class="trace-pills" id="tracePills">
-          <div class="trace-pill">Architecture: Phase 2 MAS</div>
-          <div class="trace-pill">Rate Limiting: Token Bucket Active</div>
-          <div class="trace-pill">Zero Cost Free Tier</div>
-        </div>
-      </div>
-    </section>
+        <div class="telemetry-panel">
+          <div class="metric-row">
+            <span class="metric-label">Target Pose</span>
+            <span class="metric-val" id="poseNameVal">Virabhadrasana II (Warrior II)</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Lead Knee Flexion</span>
+            <span class="metric-val ok" id="kneeAngleVal">91.8° (Target: 90° ± 5°)</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Pelvic Alignment</span>
+            <span class="metric-val ok" id="pelvicVal">178.6° (Target: 180°)</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Torso Verticality</span>
+            <span class="metric-val ok" id="torsoVal">89.4° (Target: 90°)</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Event Bus Integration</span>
+            <span class="metric-val ok" id="eventBusStatus">Active Listener</span>
+          </div>
 
-    <section class="card">
-      <h2>📋 Personalized Practice Plan & Trace</h2>
-      <div class="plan-output" id="planOutput">
-        <p style="color: var(--text-muted);">Your personalized yoga sequence will appear here once generated...</p>
+          <div class="hud-buttons">
+            <button class="btn-hud alert-btn" onclick="simulateKneeDeviation()">
+              ⚠️ Simulate Knee Deviation
+            </button>
+            <button class="btn-hud" onclick="resetToOptimal()">
+              ✓ Reset Alignment
+            </button>
+            <button class="btn-hud" onclick="toggleAnglesDisplay()">
+              📐 Toggle Angles HUD
+            </button>
+          </div>
+        </div>
       </div>
     </section>
   </main>
@@ -248,8 +555,71 @@
     let recognition = null;
     let currentAudioUrl = null;
     let currentCueText = "";
+    let selectedStrategy = "default";
+    let securityTimeout = null;
 
-    // Initialize Web Speech API for Hands-Free voice input
+    const strategyDescriptions = {
+      default: "Production default. Direct structured schema generation with internal reasoning.",
+      react: "ReAct (Reason + Act): Explicit Thought → Action → Observation cycle for full tool transparency.",
+      few_shot: "Few-Shot In-Context: Guided by reference clinical exemplars for high schema consistency.",
+      cot: "Chain-of-Thought (Explicit): Narrates reasoning inside <thinking> tags before plan generation."
+    };
+
+    function selectStrategy(strat) {
+      selectedStrategy = strat;
+      document.querySelectorAll('.strategy-chip').forEach(chip => {
+        chip.classList.toggle('active', chip.getAttribute('data-strategy') === strat);
+      });
+      document.getElementById('strategyDesc').innerText = strategyDescriptions[strat] || "";
+      document.getElementById('pillStrategy').innerText = `Strategy: ${strat.toUpperCase()}`;
+    }
+
+    // Security Guardrail Debounce Check
+    function debounceSecurityCheck() {
+      clearTimeout(securityTimeout);
+      securityTimeout = setTimeout(checkInputSecurity, 400);
+    }
+
+    async function checkInputSecurity() {
+      const text = document.getElementById('userInput').value.trim();
+      const guardText = document.getElementById('guardrailText');
+      const riskBadge = document.getElementById('riskScoreBadge');
+      const secBadge = document.getElementById('securityBadge');
+      const secBadgeText = document.getElementById('securityBadgeText');
+
+      if (!text) {
+        guardText.innerHTML = "Input Safety: Awaiting prompt...";
+        secBadge.className = "badge active";
+        secBadgeText.innerText = "Guardrail: Ready";
+        return;
+      }
+
+      try {
+        const resp = await fetch('/api/security/validate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_input: text })
+        });
+        const data = await resp.json();
+
+        riskBadge.innerText = `Risk: ${data.risk_score.toFixed(2)}`;
+
+        if (data.is_safe) {
+          guardText.innerHTML = '<span style="color: #10b981;">🛡️</span> Input Safety: Clean & Verified';
+          secBadge.className = "badge active";
+          secBadgeText.innerText = "Guardrail: Clean";
+        } else {
+          const violStr = data.violations.join(', ');
+          guardText.innerHTML = `<span style="color: #ef4444;">⚠️</span> Blocked: ${violStr}`;
+          secBadge.className = "badge danger";
+          secBadgeText.innerText = `Blocked (${violStr})`;
+        }
+      } catch (err) {
+        console.warn("Security check error:", err);
+      }
+    }
+
+    // Voice recognition setup
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       recognition = new SpeechRecognition();
@@ -267,21 +637,16 @@
       recognition.onresult = (event) => {
         const transcript = event.results[0][0].transcript;
         document.getElementById('userInput').value = transcript;
+        checkInputSecurity();
       };
 
-      recognition.onerror = (event) => {
-        console.warn('Speech recognition error:', event.error);
-        stopVoiceInput();
-      };
-
-      recognition.onend = () => {
-        stopVoiceInput();
-      };
+      recognition.onerror = () => stopVoiceInput();
+      recognition.onend = () => stopVoiceInput();
     }
 
     function toggleVoiceInput() {
       if (!recognition) {
-        alert("Web Speech API is not supported in this browser. Please use Chrome/Edge/Safari.");
+        alert("Web Speech API is not supported in this browser.");
         return;
       }
       if (isRecording) {
@@ -305,26 +670,39 @@
 
       const genBtn = document.getElementById('generateBtn');
       const outputDiv = document.getElementById('planOutput');
+      const planTag = document.getElementById('planStatusTag');
+
       genBtn.disabled = true;
       genBtn.innerHTML = '⏳ Reasoning & Planning...';
-      outputDiv.innerHTML = '<p style="color: #a78bfa;">Coordinating agents: Profile ➔ Knowledge ➔ Planner ➔ Safety ➔ Critic ➔ Response...</p>';
+      planTag.innerText = 'Synthesizing with ' + selectedStrategy;
+      outputDiv.innerHTML = '<p style="color: #a78bfa;">Coordinating agents: Profile ➔ Knowledge ➔ Planner (' + selectedStrategy + ') ➔ Safety ➔ Critic ➔ Response...</p>';
 
       try {
         const resp = await fetch('/api/practice/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_input: input, phase: 2 })
+          body: JSON.stringify({
+            user_input: input,
+            phase: 2,
+            prompt_strategy: selectedStrategy
+          })
         });
+
+        if (!resp.ok) {
+          const errData = await resp.json();
+          throw new Error(errData.detail || 'Request failed');
+        }
+
         const data = await resp.json();
-
-        // Render response
         outputDiv.innerHTML = formatMarkdown(data.final_response);
+        planTag.innerText = `Completed (Run ID: ${data.run_id.substring(0, 10)}...)`;
 
-        // Synthesize spoken guidance cue via ElevenLabs
+        // Synthesize spoken guidance cue
         synthesizeCue("Welcome to your practice. Find a comfortable seated position with a tall spine, softening your shoulders.");
 
       } catch (err) {
-        outputDiv.innerHTML = `<p style="color: #ef4444;">Error generating practice: ${err.message}</p>`;
+        outputDiv.innerHTML = `<p style="color: #ef4444; font-weight: 600;">Error: ${err.message}</p>`;
+        planTag.innerText = 'Failed';
       } finally {
         genBtn.disabled = false;
         genBtn.innerHTML = '<span>🧘</span> Generate Practice';
@@ -362,7 +740,7 @@
 
     function formatMarkdown(text) {
       if (!text) return "";
-      let html = text
+      return text
         .replace(/^# (.*$)/gim, '<h1>$1</h1>')
         .replace(/^### (.*$)/gim, '<h3>$1</h3>')
         .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
@@ -370,8 +748,201 @@
         .replace(/---/gim, '<hr/>')
         .replace(/\n\n/gim, '<br/><br/>')
         .replace(/• (.*$)/gim, '<li>$1</li>');
-      return html;
     }
+
+    // -----------------------------------------------------------------------
+    // Real-Time Biomechanics HUD Canvas Simulation (Phase 3B)
+    // -----------------------------------------------------------------------
+    const canvas = document.getElementById('skeletonCanvas');
+    const ctx = canvas.getContext('2d');
+    let showAngles = true;
+    let isDeviated = false;
+    let animFrame = null;
+    let animTick = 0;
+
+    function drawHUD() {
+      animTick += 0.03;
+      const w = canvas.width;
+      const h = canvas.height;
+
+      // Background Cyber Grid
+      ctx.fillStyle = '#06080d';
+      ctx.fillRect(0, 0, w, h);
+
+      ctx.strokeStyle = 'rgba(139, 92, 246, 0.08)';
+      ctx.lineWidth = 1;
+      const gridSize = 30;
+      for (let x = 0; x < w; x += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, h);
+        ctx.stroke();
+      }
+      for (let y = 0; y < h; y += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+      }
+
+      // Base Warrior II Keypoints
+      const cx = w / 2;
+      const cy = h / 2 - 20;
+
+      // Subtle breathing motion
+      const breath = Math.sin(animTick) * 2;
+
+      // Joints
+      const head = { x: cx - 40, y: cy - 65 + breath };
+      const neck = { x: cx - 40, y: cy - 40 + breath };
+      const spine = { x: cx - 40, y: cy + breath };
+      const pelvis = { x: cx - 40, y: cy + 35 };
+
+      // Shoulders & Arms (Warrior II horizontal T)
+      const leftShoulder = { x: cx - 65, y: cy - 35 + breath };
+      const rightShoulder = { x: cx - 15, y: cy - 35 + breath };
+      const leftElbow = { x: cx - 120, y: cy - 36 + breath };
+      const leftWrist = { x: cx - 180, y: cy - 37 + breath };
+      const rightElbow = { x: cx + 45, y: cy - 36 + breath };
+      const rightWrist = { x: cx + 110, y: cy - 37 + breath };
+
+      // Hips & Legs
+      const leftHip = { x: cx - 55, y: cy + 40 };
+      const rightHip = { x: cx - 25, y: cy + 40 };
+
+      // Back leg (straight, left)
+      const leftKnee = { x: cx - 130, y: cy + 95 };
+      const leftAnkle = { x: cx - 190, y: cy + 145 };
+
+      // Front leg (bent, right) - with deviation simulation
+      const kneeXOffset = isDeviated ? 18 : 0;
+      const kneeYOffset = isDeviated ? 12 : 0;
+      const rightKnee = { x: cx + 55 - kneeXOffset, y: cy + 95 + kneeYOffset };
+      const rightAnkle = { x: cx + 55, y: cy + 145 };
+
+      // Bone Segments
+      const bones = [
+        [neck, head],
+        [leftShoulder, rightShoulder],
+        [neck, spine],
+        [spine, pelvis],
+        [leftShoulder, leftElbow],
+        [leftElbow, leftWrist],
+        [rightShoulder, rightElbow],
+        [rightElbow, rightWrist],
+        [leftHip, rightHip],
+        [leftHip, leftKnee],
+        [leftKnee, leftAnkle],
+        [rightHip, rightKnee],
+        [rightKnee, rightAnkle]
+      ];
+
+      // Draw Bones
+      ctx.lineWidth = 3;
+      ctx.shadowBlur = 10;
+      bones.forEach(([p1, p2]) => {
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+
+        if (isDeviated && (p1 === rightKnee || p2 === rightKnee)) {
+          ctx.strokeStyle = '#f59e0b';
+          ctx.shadowColor = '#f59e0b';
+        } else {
+          ctx.strokeStyle = '#10b981';
+          ctx.shadowColor = '#10b981';
+        }
+        ctx.stroke();
+      });
+
+      // Draw Joints
+      const joints = [
+        head, neck, spine, pelvis,
+        leftShoulder, rightShoulder, leftElbow, rightElbow, leftWrist, rightWrist,
+        leftHip, rightHip, leftKnee, rightKnee, leftAnkle, rightAnkle
+      ];
+
+      joints.forEach((j) => {
+        ctx.beginPath();
+        ctx.arc(j.x, j.y, 5, 0, Math.PI * 2);
+        if (isDeviated && j === rightKnee) {
+          ctx.fillStyle = '#ef4444';
+          ctx.shadowColor = '#ef4444';
+        } else {
+          ctx.fillStyle = '#38bdf8';
+          ctx.shadowColor = '#38bdf8';
+        }
+        ctx.fill();
+      });
+
+      // Angle Arc & Label on Front Knee
+      if (showAngles) {
+        ctx.shadowBlur = 0;
+        ctx.beginPath();
+        const angleRadius = 24;
+        ctx.arc(rightKnee.x, rightKnee.y, angleRadius, -Math.PI / 2, Math.PI / 4);
+        ctx.strokeStyle = isDeviated ? '#f59e0b' : '#34d399';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.font = '11px JetBrains Mono';
+        ctx.fillStyle = isDeviated ? '#f59e0b' : '#34d399';
+        const displayAngle = isDeviated ? "112.4° [DEV]" : "91.8° [OK]";
+        ctx.fillText(displayAngle, rightKnee.x + 12, rightKnee.y - 12);
+      }
+
+      animFrame = requestAnimationFrame(drawHUD);
+    }
+
+    function simulateKneeDeviation() {
+      isDeviated = true;
+      document.getElementById('hudStatusBadge').innerText = "⚠️ POSTURE DEVIATION: KNEE VALGUS DETECTED";
+      document.getElementById('hudStatusBadge').style.borderColor = "#f59e0b";
+      document.getElementById('hudStatusBadge').style.color = "#fbbf24";
+      document.getElementById('hudStatusBadge').style.background = "rgba(245, 158, 11, 0.2)";
+
+      document.getElementById('kneeAngleVal').innerText = "112.4° (Deviation: +22.4°)";
+      document.getElementById('kneeAngleVal').className = "metric-val warn";
+
+      // Publish event to Event Bus
+      fetch('/api/events/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event_type: 'PostureDeviation',
+          user_id: 'StudioUser',
+          payload: {
+            pose_name: 'Virabhadrasana II',
+            joint_name: 'right_knee',
+            measured_angle: 112.4,
+            target_angle_range: [85.0, 95.0],
+            deviation_deg: 22.4,
+            severity: 'moderate',
+            correction_cue: 'Stack right knee directly above your right ankle'
+          }
+        })
+      }).catch(err => console.warn(err));
+
+      synthesizeCue("Alignment note: Stack your right knee directly above your ankle to protect the knee joint.");
+    }
+
+    function resetToOptimal() {
+      isDeviated = false;
+      document.getElementById('hudStatusBadge').innerText = "🟢 VIRABHADRASANA II • OPTIMAL ALIGNMENT";
+      document.getElementById('hudStatusBadge').style.borderColor = "#10b981";
+      document.getElementById('hudStatusBadge').style.color = "#34d399";
+      document.getElementById('hudStatusBadge').style.background = "rgba(16, 185, 129, 0.2)";
+
+      document.getElementById('kneeAngleVal').innerText = "91.8° (Target: 90° ± 5°)";
+      document.getElementById('kneeAngleVal').className = "metric-val ok";
+    }
+
+    function toggleAnglesDisplay() {
+      showAngles = !showAngles;
+    }
+
+    // Start HUD loop
+    drawHUD();
   </script>
 </body>
 </html>

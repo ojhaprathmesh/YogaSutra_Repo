@@ -1,0 +1,114 @@
+# ==============================================================================
+# Kubernetes Production Deployment & Service Manifests for YogaSutra
+# ==============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: yogasutra
+  labels:
+    app.kubernetes.io/name: yogasutra
+    app.kubernetes.io/part-of: yogasutra-system
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: yogasutra-secrets
+  namespace: yogasutra
+type: Opaque
+stringData:
+  GOOGLE_API_KEY: "replace-with-google-api-key"
+  NVIDIA_API_KEY: ""
+  ELEVENLABS_API_KEY: ""
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: yogasutra-config
+  namespace: yogasutra
+data:
+  YOGASUTRA_MODEL: "gemini-2.5-flash"
+  YOGASUTRA_LOG_LEVEL: "INFO"
+  ENABLE_GUARDRAILS: "true"
+  PORT: "8000"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: yogasutra-api
+  namespace: yogasutra
+  labels:
+    app: yogasutra-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: yogasutra-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: yogasutra-api
+    spec:
+      containers:
+        - name: yogasutra-api
+          image: yogasutra/yogasutra-api:v0.2.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              name: http
+          envFrom:
+            - configMapRef:
+                name: yogasutra-config
+            - secretRef:
+                name: yogasutra-secrets
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2000m"
+              memory: "2Gi"
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 2
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            readOnlyRootFilesystem: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: yogasutra-service
+  namespace: yogasutra
+  labels:
+    app: yogasutra-api
+spec:
+  type: ClusterIP
+  selector:
+    app: yogasutra-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000

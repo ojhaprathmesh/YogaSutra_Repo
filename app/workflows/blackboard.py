@@ -39,6 +39,8 @@ class Blackboard:
             "candidate_plan": BlackboardChannel(name="candidate_plan"),
             "validation_results": BlackboardChannel(name="validation_results"),
             "critique": BlackboardChannel(name="critique"),
+            "crewai_audit": BlackboardChannel(name="crewai_audit"),
+            "a2a_messages": BlackboardChannel(name="a2a_messages"),
             "audio_cues": BlackboardChannel(name="audio_cues"),
         }
         self.event_log: list[dict[str, Any]] = []

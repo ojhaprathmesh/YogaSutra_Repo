@@ -1,0 +1,110 @@
+# ==============================================================================
+# YogaSutra — Multi-Service Docker Compose Orchestration
+# ==============================================================================
+# Services:
+# 1. yogasutra-api:  Main FastAPI application & Static Practice Studio UI
+# 2. yogasutra-mcp:  Model Context Protocol (MCP) domain tool microservice
+# 3. yogasutra-eval: Performance, latency, and cost benchmark runner profile
+# ==============================================================================
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. Main Application & Interactive Studio Service
+  # ----------------------------------------------------------------------------
+  yogasutra-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: yogasutra-api
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8000}:8000"
+    environment:
+      - PORT=8000
+      - HOST=0.0.0.0
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY:-}
+      - OLLAMA_API_KEY=${OLLAMA_API_KEY:-}
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY:-}
+      - YOGASUTRA_MODEL=${YOGASUTRA_MODEL:-gemini-2.5-flash}
+      - YOGASUTRA_TRACE_DIR=/app/data/traces
+      - YOGASUTRA_LOG_LEVEL=${YOGASUTRA_LOG_LEVEL:-INFO}
+      - MCP_SERVER_URL=http://yogasutra-mcp:8001
+    volumes:
+      - trace-data:/app/data/traces
+      - audio-cache:/app/data/audio_cache
+      - eval-data:/app/data/evaluation
+    networks:
+      - yogasutra-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ----------------------------------------------------------------------------
+  # 2. Model Context Protocol (MCP) Microservice
+  # ----------------------------------------------------------------------------
+  yogasutra-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: yogasutra-mcp
+    restart: unless-stopped
+    ports:
+      - "${MCP_PORT:-8001}:8001"
+    command: ["python3", "-m", "app.mcp.server", "--port", "8001"]
+    environment:
+      - PORT=8001
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - YOGASUTRA_LOG_LEVEL=${YOGASUTRA_LOG_LEVEL:-INFO}
+    volumes:
+      - ./data/knowledge:/app/data/knowledge:ro
+    networks:
+      - yogasutra-network
+
+  # ----------------------------------------------------------------------------
+  # 3. Comprehensive Benchmark & Evaluation Profile
+  # ----------------------------------------------------------------------------
+  yogasutra-eval:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: yogasutra-eval
+    profiles:
+      - eval
+    command: ["python3", "scripts/run_comprehensive_benchmark.py"]
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY:-}
+      - OLLAMA_API_KEY=${OLLAMA_API_KEY:-}
+      - YOGASUTRA_MODEL=${YOGASUTRA_MODEL:-gemini-2.5-flash}
+      - YOGASUTRA_TRACE_DIR=/app/data/traces
+      - YOGASUTRA_LOG_LEVEL=INFO
+    volumes:
+      - eval-data:/app/data/evaluation
+      - trace-data:/app/data/traces
+    networks:
+      - yogasutra-network
+    depends_on:
+      yogasutra-api:
+        condition: service_healthy
+
+# ------------------------------------------------------------------------------
+# Persistent Volumes & Network Topology
+# ------------------------------------------------------------------------------
+volumes:
+  trace-data:
+    driver: local
+  audio-cache:
+    driver: local
+  eval-data:
+    driver: local
+
+networks:
+  yogasutra-network:
+    driver: bridge
