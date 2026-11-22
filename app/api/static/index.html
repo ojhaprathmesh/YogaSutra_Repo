@@ -894,6 +894,122 @@
       animFrame = requestAnimationFrame(drawHUD);
     }
 
+    // -----------------------------------------------------------------------
+    // Live Event Bus SSE Stream (/api/events/stream)
+    // -----------------------------------------------------------------------
+    let eventSource = null;
+    let sseConnected = false;
+    let sseReconnectTimer = null;
+
+    function speakOrPlayCue(text, audioUrl) {
+      if (!text && !audioUrl) return;
+      currentCueText = text || "";
+      currentAudioUrl = audioUrl || null;
+      document.getElementById('audioPlayerBar').style.display = 'flex';
+      document.getElementById('audioCueText').innerText = text ? `"${text}"` : 'Audio cue ready';
+
+      if (audioUrl) {
+        const audio = new Audio(audioUrl);
+        audio.play().catch(() => {
+          if (text && 'speechSynthesis' in window) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 0.9;
+            window.speechSynthesis.speak(utterance);
+          }
+        });
+      } else if (text && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 0.9;
+        window.speechSynthesis.speak(utterance);
+      }
+    }
+
+    function applyPostureDeviationEvent(data) {
+      isDeviated = true;
+      const badge = document.getElementById('hudStatusBadge');
+      const poseLabel = (data.pose_name || 'POSTURE').toUpperCase();
+      const jointLabel = (data.joint_name || 'JOINT').replace(/_/g, ' ').toUpperCase();
+      const cue = data.correction_cue || 'Adjust alignment';
+
+      badge.innerText = `⚠️ ${poseLabel} • ${jointLabel} DEVIATION: ${cue}`;
+      badge.style.borderColor = "#f59e0b";
+      badge.style.color = "#fbbf24";
+      badge.style.background = "rgba(245, 158, 11, 0.2)";
+
+      if (data.pose_name) {
+        document.getElementById('poseNameVal').innerText = data.pose_name;
+      }
+      if (typeof data.measured_angle === 'number' || typeof data.deviation_deg === 'number') {
+        const angleStr = typeof data.measured_angle === 'number' ? `${data.measured_angle.toFixed(1)}°` : 'N/A';
+        const devStr = typeof data.deviation_deg === 'number' ? `+${data.deviation_deg.toFixed(1)}°` : '';
+        document.getElementById('kneeAngleVal').innerText = `${angleStr} (Deviation: ${devStr})`;
+        document.getElementById('kneeAngleVal').className = "metric-val warn";
+      }
+
+      speakOrPlayCue(cue, data.audio_url);
+    }
+
+    function applySafetyEscalationEvent(data) {
+      const badge = document.getElementById('hudStatusBadge');
+      const cond = data.trigger_condition || 'Safety escalation triggered';
+      badge.innerText = `🚨 SAFETY ESCALATION: ${cond}`;
+      badge.style.borderColor = "#ef4444";
+      badge.style.color = "#f87171";
+      badge.style.background = "rgba(239, 68, 68, 0.2)";
+      speakOrPlayCue(data.correction_cue || `Safety alert: ${cond}`, data.audio_url);
+    }
+
+    function initEventStream() {
+      if (typeof EventSource === 'undefined') return;
+      if (eventSource) {
+        eventSource.close();
+      }
+      const statusEl = document.getElementById('eventBusStatus');
+      eventSource = new EventSource('/api/events/stream');
+
+      eventSource.addEventListener('connected', () => {
+        sseConnected = true;
+        if (statusEl) {
+          statusEl.innerText = 'Live SSE Connected';
+          statusEl.className = 'metric-val ok';
+        }
+      });
+
+      eventSource.onopen = () => {
+        sseConnected = true;
+        if (statusEl) {
+          statusEl.innerText = 'Live SSE Connected';
+          statusEl.className = 'metric-val ok';
+        }
+      };
+
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.event_type === 'PostureDeviation') {
+            applyPostureDeviationEvent(data);
+          } else if (data.event_type === 'SafetyEscalation') {
+            applySafetyEscalationEvent(data);
+          }
+        } catch (err) {
+          console.warn('SSE parse error:', err);
+        }
+      };
+
+      eventSource.onerror = () => {
+        sseConnected = false;
+        if (statusEl) {
+          statusEl.innerText = 'Reconnecting SSE...';
+          statusEl.className = 'metric-val warn';
+        }
+        if (eventSource && eventSource.readyState === EventSource.CLOSED) {
+          clearTimeout(sseReconnectTimer);
+          sseReconnectTimer = setTimeout(initEventStream, 3000);
+        }
+      };
+    }
+
     function simulateKneeDeviation() {
       isDeviated = true;
       document.getElementById('hudStatusBadge').innerText = "⚠️ POSTURE DEVIATION: KNEE VALGUS DETECTED";
@@ -904,7 +1020,9 @@
       document.getElementById('kneeAngleVal').innerText = "112.4° (Deviation: +22.4°)";
       document.getElementById('kneeAngleVal').className = "metric-val warn";
 
-      // Publish event to Event Bus
+      const cueText = 'Stack right knee directly above your right ankle to protect the knee joint.';
+
+      // Publish event to Event Bus (SSE stream handles HUD + audio playback when connected)
       fetch('/api/events/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -918,12 +1036,22 @@
             target_angle_range: [85.0, 95.0],
             deviation_deg: 22.4,
             severity: 'moderate',
-            correction_cue: 'Stack right knee directly above your right ankle'
+            correction_cue: cueText
           }
         })
-      }).catch(err => console.warn(err));
-
-      synthesizeCue("Alignment note: Stack your right knee directly above your ankle to protect the knee joint.");
+      })
+        .then(resp => resp.json())
+        .then(data => {
+          if (!sseConnected) {
+            speakOrPlayCue(data.cue || cueText, data.audio_url || null);
+          }
+        })
+        .catch(err => {
+          console.warn(err);
+          if (!sseConnected) {
+            synthesizeCue(cueText);
+          }
+        });
     }
 
     function resetToOptimal() {
@@ -941,8 +1069,9 @@
       showAngles = !showAngles;
     }
 
-    // Start HUD loop
+    // Start HUD loop & live SSE event stream
     drawHUD();
+    initEventStream();
   </script>
 </body>
 </html>

@@ -35,7 +35,7 @@ config:
 ---
 flowchart TB
     subgraph Client["Multimodal Client Tier"]
-        UI["Multimodal Client (Next.js / CLI)"]
+        UI["Multimodal Client (Next.js"]
     end
 
     subgraph Perception["Sensory Perception & Biomechanics"]

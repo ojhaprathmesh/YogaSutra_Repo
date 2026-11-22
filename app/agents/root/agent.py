@@ -115,6 +115,28 @@ phase2_root_agent = SequentialAgent(
 root_agent = phase2_root_agent
 
 
+def create_revision_agent() -> SequentialAgent:
+    """
+    Create a fresh revision sub-pipeline using cloned sub-agents so ADK parent
+    ownership does not collide with `phase2_root_agent`.
+
+    Executes: PlannerAgent -> SafetyAgent -> CriticAgent -> ResponseAgent.
+    """
+    return SequentialAgent(
+        name="RevisionRootAgent",
+        description=(
+            "Revision sub-pipeline for YogaSutra Phase 2 reflection loop. Executes: "
+            "PlannerAgent -> SafetyAgent -> CriticAgent -> ResponseAgent."
+        ),
+        sub_agents=[
+            planner_agent.clone(),
+            safety_agent.clone(),
+            critic_agent.clone(),
+            response_agent.clone(),
+        ],
+    )
+
+
 # ---------------------------------------------------------------------------
 # Requirements 6 & 7: ADK <-> CrewAI A2A Handoff & Tool Integration
 # ---------------------------------------------------------------------------

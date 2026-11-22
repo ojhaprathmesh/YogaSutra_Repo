@@ -13,14 +13,15 @@ Provides REST and Static UI endpoints for:
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 
 from app.audio.elevenlabs import elevenlabs_client
@@ -274,6 +275,39 @@ def get_event_history(event_type: str | None = None, limit: int = 50) -> list[di
     return [e.model_dump() for e in events]
 
 
+@app.get("/api/events/stream")
+async def stream_events(request: Request) -> StreamingResponse:
+    """Server-Sent Events (SSE) stream of live PostureDeviation and SafetyEscalation events."""
+    bus = get_event_bus()
+    queue = bus.add_stream_listener()
+
+    async def event_generator():
+        try:
+            yield f"event: connected\ndata: {json.dumps({'status': 'connected'})}\n\n"
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    payload = await asyncio.wait_for(queue.get(), timeout=15.0)
+                    yield f"data: {json.dumps(payload)}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": keepalive\n\n"
+        except asyncio.CancelledError:
+            pass
+        finally:
+            bus.remove_stream_listener(queue)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @app.post("/api/events/publish")
 def publish_event(req: EventPublishRequest) -> dict[str, Any]:
     """Publish an event to the YogaSutra Event Bus."""
@@ -326,12 +360,23 @@ def publish_event(req: EventPublishRequest) -> dict[str, Any]:
         )
 
     results = bus.publish_sync(evt)
-    return {
+    serializable_results = [r for r in results if isinstance(r, dict)]
+    response: dict[str, Any] = {
         "status": "published",
         "event_id": evt.event_id,
         "event_type": evt.event_type,
         "handled_results_count": len(results),
+        "results": serializable_results,
     }
+    if req.event_type == "PostureDeviation":
+        for res in serializable_results:
+            if res.get("handled"):
+                response["cue"] = res.get("cue")
+                response["audio_url"] = res.get("audio_url")
+                response["provider"] = res.get("provider")
+                response["voice_name"] = res.get("voice_name")
+                break
+    return response
 
 
 @app.get("/api/memory/trajectory/{user_id}")

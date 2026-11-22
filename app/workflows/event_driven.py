@@ -16,8 +16,10 @@ from __future__ import annotations
 import asyncio
 import inspect
 import logging
+import threading
 import uuid
 from datetime import datetime, UTC
+from pathlib import Path
 from typing import Any, Callable
 
 from pydantic import BaseModel, Field
@@ -113,6 +115,114 @@ class EventBus:
         self._journal: list[BaseEvent] = []
         self._max_journal_size = max_journal_size
         self._lock = asyncio.Lock() if asyncio else None
+        self._stream_lock = threading.Lock()
+        self._stream_listeners: list[tuple[asyncio.AbstractEventLoop | None, asyncio.Queue[dict[str, Any]]]] = []
+        self._recent_stream_events: list[dict[str, Any]] = []
+
+    def add_stream_listener(self, maxsize: int = 100) -> asyncio.Queue[dict[str, Any]]:
+        """Register an async queue to receive live broadcasted stream events (SSE/WS)."""
+        queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=maxsize)
+        try:
+            loop: asyncio.AbstractEventLoop | None = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        with self._stream_lock:
+            self._stream_listeners.append((loop, queue))
+        return queue
+
+    def remove_stream_listener(self, queue: asyncio.Queue[dict[str, Any]]) -> None:
+        """Unregister a previously added stream listener queue."""
+        with self._stream_lock:
+            self._stream_listeners = [
+                (lp, q) for lp, q in self._stream_listeners if q is not queue
+            ]
+
+    def get_recent_cue_events(self, limit: int = 20) -> list[dict[str, Any]]:
+        """Return recent broadcasted stream event payloads."""
+        with self._stream_lock:
+            return list(self._recent_stream_events[-limit:])
+
+    def broadcast_stream_event(self, payload: dict[str, Any]) -> None:
+        """Thread-safe broadcast of a JSON-serializable event payload to all stream listeners."""
+        with self._stream_lock:
+            self._recent_stream_events.append(payload)
+            if len(self._recent_stream_events) > 50:
+                self._recent_stream_events.pop(0)
+            listeners = list(self._stream_listeners)
+
+        def _enqueue(q: asyncio.Queue[dict[str, Any]], item: dict[str, Any]) -> None:
+            if q.full():
+                try:
+                    q.get_nowait()
+                except asyncio.QueueEmpty:
+                    pass
+            try:
+                q.put_nowait(item)
+            except asyncio.QueueFull:
+                pass
+
+        try:
+            current_loop: asyncio.AbstractEventLoop | None = asyncio.get_running_loop()
+        except RuntimeError:
+            current_loop = None
+
+        for loop, queue in listeners:
+            if loop is not None and not loop.is_closed():
+                if current_loop is loop:
+                    _enqueue(queue, payload)
+                else:
+                    try:
+                        loop.call_soon_threadsafe(_enqueue, queue, payload)
+                    except RuntimeError:
+                        pass
+            else:
+                _enqueue(queue, payload)
+
+    def _maybe_broadcast_stream_event(self, event: BaseEvent, results: list[Any]) -> None:
+        """Broadcast PostureDeviation and SafetyEscalation events to connected stream listeners."""
+        if isinstance(event, PostureDeviationEvent):
+            audio_url: str | None = None
+            provider = "webspeech"
+            voice_name = "Default Calming Voice"
+            for res in results:
+                if isinstance(res, dict) and res.get("handled"):
+                    audio_url = res.get("audio_url")
+                    provider = res.get("provider", provider)
+                    voice_name = res.get("voice_name", voice_name)
+                    break
+            self.broadcast_stream_event(
+                {
+                    "event_id": event.event_id,
+                    "event_type": event.event_type,
+                    "user_id": event.user_id,
+                    "pose_name": event.pose_name,
+                    "joint_name": event.joint_name,
+                    "measured_angle": event.measured_angle,
+                    "deviation_deg": event.deviation_deg,
+                    "severity": event.severity,
+                    "correction_cue": event.correction_cue,
+                    "audio_url": audio_url,
+                    "provider": provider,
+                    "voice_name": voice_name,
+                    "timestamp": event.timestamp,
+                }
+            )
+        elif isinstance(event, SafetyEscalationEvent):
+            self.broadcast_stream_event(
+                {
+                    "event_id": event.event_id,
+                    "event_type": event.event_type,
+                    "user_id": event.user_id,
+                    "severity": event.severity,
+                    "trigger_condition": event.trigger_condition,
+                    "action_required": event.action_required,
+                    "recommended_alternatives": event.recommended_alternatives,
+                    "correction_cue": f"Safety alert: {event.trigger_condition}. Action: {event.action_required}.",
+                    "audio_url": None,
+                    "provider": "webspeech",
+                    "timestamp": event.timestamp,
+                }
+            )
 
     def subscribe(self, event_type: str, handler: Callable[..., Any]) -> None:
         """Register a subscriber callback for a given event type or '*'."""
@@ -163,6 +273,7 @@ class EventBus:
                 logger.error("Error executing handler for %s: %s", event.event_type, exc)
                 results.append({"error": str(exc)})
 
+        self._maybe_broadcast_stream_event(event, results)
         return results
 
     async def publish(self, event: BaseEvent, state: YogaSessionState | None = None) -> list[Any]:
@@ -188,6 +299,7 @@ class EventBus:
                 logger.error("Error executing async handler for %s: %s", event.event_type, exc)
                 results.append({"error": str(exc)})
 
+        self._maybe_broadcast_stream_event(event, results)
         return results
 
     def record_to_state(self, state: YogaSessionState, event: BaseEvent) -> None:
@@ -205,6 +317,9 @@ class EventBus:
         """Clear all subscribers and history (useful for test isolation)."""
         self._subscribers.clear()
         self._journal.clear()
+        with self._stream_lock:
+            self._stream_listeners.clear()
+            self._recent_stream_events.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -250,10 +365,27 @@ def _register_default_handlers(bus: EventBus) -> None:
                 event.deviation_deg,
                 event.correction_cue,
             )
+            audio_url: str | None = None
+            provider = "webspeech"
+            voice_name = "Default Calming Voice"
+            try:
+                from app.audio.tts import tts_engine
+
+                cue = tts_engine.synthesize_cue(event.correction_cue)
+                if cue.audio_path:
+                    audio_url = f"/api/audio/file/{Path(cue.audio_path).name}"
+                provider = cue.provider
+                voice_name = cue.voice_name
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("TTS synthesis failed for posture cue; falling back to WebSpeech: %s", exc)
+
             return {
                 "handled": True,
                 "cue": event.correction_cue,
                 "severity": event.severity,
+                "audio_url": audio_url,
+                "provider": provider,
+                "voice_name": voice_name,
             }
         return {}
 

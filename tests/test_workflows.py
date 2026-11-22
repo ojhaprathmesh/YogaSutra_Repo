@@ -37,9 +37,25 @@ class TestBlackboard:
 class TestSequentialWorkflow:
     def test_should_revise_decision(self):
         wf = SequentialWorkflow(max_revisions=2)
+        assert wf.should_revise({"decision": "REVISION_REQUIRED"}, current_revision=0) is True
+        assert wf.should_revise({"decision": "REVISION_REQUIRED"}, current_revision=1) is True
         assert wf.should_revise({"decision": "REVISE"}, current_revision=0) is True
+        assert wf.should_revise({"decision": "FAIL"}, current_revision=0) is True
         assert wf.should_revise({"decision": "PASS"}, current_revision=0) is False
         assert wf.should_revise({"decision": "REVISE"}, current_revision=2) is False
+        assert wf.should_revise({"decision": "REVISION_REQUIRED"}, current_revision=2) is False
+        assert wf.should_revise({"decision": "REVISION_REQUIRED"}, current_revision=3) is False
+
+    def test_should_revise_json_and_plain_strings(self):
+        wf = SequentialWorkflow(max_revisions=2)
+        assert wf.should_revise('{"decision": "REVISION_REQUIRED", "score": 4}', current_revision=0) is True
+        assert wf.should_revise('```json\n{"decision": "REVISION_REQUIRED"}\n```', current_revision=0) is True
+        assert wf.should_revise('{"decision": "REVISE"}', current_revision=1) is True
+        assert wf.should_revise('{"decision": "PASS", "critique": "No need to revise"}', current_revision=0) is False
+        assert wf.should_revise("REVISION_REQUIRED: omit headstand", current_revision=0) is True
+        assert wf.should_revise("PASS", current_revision=0) is False
+        assert wf.should_revise('{"decision": "REVISION_REQUIRED"}', current_revision=2) is False
+        assert wf.should_revise(None, current_revision=0) is False
 
     def test_build_revision_prompt(self):
         wf = SequentialWorkflow()
@@ -49,6 +65,19 @@ class TestSequentialWorkflow:
         )
         assert "Headstand is inappropriate" in prompt
         assert "Balasana" in prompt
+
+    def test_build_revision_prompt_with_structured_critique(self):
+        wf = SequentialWorkflow()
+        prompt = wf.build_revision_prompt(
+            candidate_plan={"sequence": [{"name": "Sirsasana"}]},
+            critique_data={
+                "decision": "REVISION_REQUIRED",
+                "critique": "Sirsasana is unsafe for beginners.",
+                "recommended_modifications": ["Replace Sirsasana with Viparita Karani"],
+            },
+        )
+        assert "Sirsasana is unsafe for beginners." in prompt
+        assert "Replace Sirsasana with Viparita Karani" in prompt
 
 
 class TestHierarchicalWorkflow:

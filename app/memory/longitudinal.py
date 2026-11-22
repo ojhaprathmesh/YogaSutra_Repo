@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import datetime, date, UTC
 from pathlib import Path
 from typing import Any
@@ -238,6 +239,9 @@ def _wire_event_subscribers(store: LongitudinalMemoryStore) -> None:
 
     def on_session_completed(event: BaseEvent) -> None:
         if isinstance(event, SessionCompletedEvent):
+            existing = store.get_trajectory(event.user_id)
+            if any(rec.session_id == event.session_id for rec in existing.session_history):
+                return
             store.record_session(
                 user_id=event.user_id,
                 session_id=event.session_id,
@@ -266,3 +270,135 @@ def _wire_event_subscribers(store: LongitudinalMemoryStore) -> None:
     bus.subscribe("SessionCompleted", on_session_completed)
     bus.subscribe("FeedbackReceived", on_feedback_received)
     bus.subscribe("SafetyEscalation", on_safety_escalation)
+
+
+# ---------------------------------------------------------------------------
+# Pipeline Integration Helpers
+# ---------------------------------------------------------------------------
+
+
+def _parse_state_dict(value: Any) -> dict[str, Any]:
+    """Safely parse a dict or (possibly markdown-fenced) JSON string into a dict."""
+    if isinstance(value, dict):
+        return value
+    if not isinstance(value, str):
+        return {}
+    cleaned = value.strip()
+    cleaned = re.sub(r"^```[a-zA-Z]*\s*", "", cleaned)
+    cleaned = re.sub(r"\s*```$", "", cleaned).strip()
+    try:
+        parsed = json.loads(cleaned)
+        if isinstance(parsed, dict):
+            return parsed
+    except (json.JSONDecodeError, TypeError):
+        pass
+    match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+    if match:
+        try:
+            parsed = json.loads(match.group(0))
+            if isinstance(parsed, dict):
+                return parsed
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return {}
+
+
+def build_longitudinal_context(
+    user_id: str,
+    store: LongitudinalMemoryStore | None = None,
+) -> dict[str, Any]:
+    """Build a concise longitudinal history summary for ProfileAgent and session state."""
+    active_store = store or get_longitudinal_store()
+    trajectory = active_store.get_trajectory(user_id)
+
+    recent_goals = [
+        rec.plan_goal
+        for rec in trajectory.session_history[-3:]
+        if rec.plan_goal
+    ]
+    frequent_poses = [
+        pose
+        for pose, _ in sorted(
+            trajectory.pose_frequency.items(),
+            key=lambda item: (-item[1], item[0]),
+        )[:5]
+    ]
+
+    return {
+        "user_id": trajectory.user_id,
+        "total_sessions_completed": trajectory.total_sessions_completed,
+        "current_streak_days": trajectory.current_streak_days,
+        "active_contraindications": list(trajectory.active_contraindications),
+        "injury_history": list(trajectory.injury_history),
+        "suggested_level_override": trajectory.suggested_level_override,
+        "recent_goals": recent_goals,
+        "frequent_poses": frequent_poses,
+    }
+
+
+def record_pipeline_completion(
+    user_id: str,
+    session_id: str,
+    session_state: dict[str, Any],
+    store: LongitudinalMemoryStore | None = None,
+) -> UserTrajectory:
+    """Persist completed pipeline session and newly extracted user constraints."""
+    active_store = store or get_longitudinal_store()
+    profile_dict = _parse_state_dict(session_state.get("user_profile"))
+    plan_dict = _parse_state_dict(session_state.get("candidate_plan"))
+
+    # Extract pose names from candidate_plan.sequence
+    completed_poses: list[str] = []
+    raw_sequence = plan_dict.get("sequence", [])
+    if isinstance(raw_sequence, list):
+        for item in raw_sequence:
+            if isinstance(item, dict):
+                name = item.get("name") or item.get("pose_name") or item.get("pose")
+                if isinstance(name, str) and name.strip():
+                    completed_poses.append(name.strip())
+            elif isinstance(item, str) and item.strip():
+                completed_poses.append(item.strip())
+
+    # Extract duration_minutes safely
+    raw_duration = plan_dict.get("duration_minutes")
+    if raw_duration is None:
+        raw_duration = plan_dict.get("total_duration_minutes", 0)
+    try:
+        duration_minutes = max(0, int(raw_duration))
+    except (ValueError, TypeError):
+        duration_minutes = 0
+
+    plan_goal = str(
+        plan_dict.get("goal")
+        or profile_dict.get("goal")
+        or "general"
+    )
+
+    if completed_poses or duration_minutes > 0:
+        trajectory = active_store.record_session(
+            user_id=user_id,
+            session_id=session_id,
+            duration_minutes=duration_minutes,
+            plan_goal=plan_goal,
+            completed_poses=completed_poses,
+        )
+    else:
+        trajectory = active_store.get_trajectory(user_id)
+
+    # Merge newly extracted constraints into active_contraindications (deduplicated)
+    raw_constraints = profile_dict.get("constraints", [])
+    updated_contraindications = False
+    if isinstance(raw_constraints, list):
+        existing_lower = {c.lower() for c in trajectory.active_contraindications}
+        for constraint in raw_constraints:
+            if isinstance(constraint, str):
+                cleaned = constraint.strip()
+                if cleaned and cleaned.lower() not in existing_lower:
+                    trajectory.active_contraindications.append(cleaned)
+                    existing_lower.add(cleaned.lower())
+                    updated_contraindications = True
+
+    if updated_contraindications:
+        active_store.save_trajectory(trajectory)
+
+    return trajectory
