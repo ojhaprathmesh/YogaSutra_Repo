@@ -14,6 +14,7 @@ import logging
 import os
 import urllib.error
 import urllib.request
+from collections.abc import Iterator
 from pathlib import Path
 
 from app.audio.cache import audio_cache
@@ -141,6 +142,97 @@ class ElevenLabsClient:
         except Exception as e:
             logger.error(f"[ElevenLabs] Synthesis error: {e}")
             return None
+
+    def synthesize_stream(
+        self,
+        text: str,
+        voice_id: str = DEFAULT_VOICE_ID,
+        model_id: str = DEFAULT_MODEL_ID,
+    ) -> Iterator[bytes]:
+        """
+        Stream MP3 audio bytes for a text cue.
+
+        - If cached on disk, streams the cached MP3 in 8KB chunks (0 characters consumed).
+        - Otherwise, if configured and quota is sufficient, streams from ElevenLabs
+          /v1/text-to-speech/{voice_id}/stream and caches assembled bytes on disk.
+        - If unconfigured, quota-exhausted, or on error, yields nothing cleanly.
+        """
+        if not text.strip():
+            return
+
+        chunk_size = 8192
+
+        # 1. Stream directly from disk cache if available (0-character consumption)
+        cached_path = audio_cache.get(text, voice_id, model=model_id)
+        if cached_path and cached_path.exists():
+            try:
+                with cached_path.open("rb") as f:
+                    while chunk := f.read(chunk_size):
+                        yield chunk
+                return
+            except Exception as e:
+                logger.warning(f"[ElevenLabs] Failed reading cached stream {cached_path}: {e}")
+
+        if not self.is_configured:
+            logger.info("[ElevenLabs] API key not configured. Skipping stream synthesis.")
+            return
+
+        # 2. Check quota
+        quota = self.check_quota()
+        remaining = int(quota.get("remaining_characters", 0))
+        if remaining < len(text):
+            logger.warning(
+                f"[ElevenLabs] Insufficient character quota ({remaining} < {len(text)}). "
+                f"Skipping ElevenLabs stream to prevent overage."
+            )
+            return
+
+        # 3. Request streaming audio synthesis
+        url = f"{self.base_url}/text-to-speech/{voice_id}/stream"
+        payload = {
+            "text": text,
+            "model_id": model_id,
+            "voice_settings": {
+                "stability": 0.75,
+                "similarity_boost": 0.75,
+                "style": 0.20,
+                "use_speaker_boost": True,
+            },
+        }
+
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "xi-api-key": self.api_key,
+                "Content-Type": "application/json",
+                "Accept": "audio/mpeg",
+            },
+            method="POST",
+        )
+
+        buffer = bytearray()
+        try:
+            with urllib.request.urlopen(req, timeout=20, context=self._ssl_ctx) as resp:
+                while True:
+                    chunk = resp.read(chunk_size)
+                    if not chunk:
+                        break
+                    buffer.extend(chunk)
+                    yield chunk
+
+            if buffer:
+                saved_path = audio_cache.put(text, voice_id, bytes(buffer), ext="mp3", model=model_id)
+                logger.info(
+                    f"[ElevenLabs] Streamed & cached {len(text)} chars ({len(buffer)} bytes) -> {saved_path.name}"
+                )
+        except urllib.error.HTTPError as e:
+            err_body = e.read().decode("utf-8", errors="ignore")
+            logger.error(f"[ElevenLabs] Stream HTTP {e.code} error: {err_body}")
+            return
+        except Exception as e:
+            logger.error(f"[ElevenLabs] Stream synthesis error: {e}")
+            return
 
 
 # Global singleton client

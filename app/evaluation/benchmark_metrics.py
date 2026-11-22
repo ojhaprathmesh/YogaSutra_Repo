@@ -142,6 +142,14 @@ RATE_CARDS: dict[str, RateCard] = {
         commercial_input_per_m=0.200,
         commercial_output_per_m=0.500,
     ),
+    "nvidia/nemotron-3.5-bolt-e4b": RateCard(
+        provider_name="NVIDIA NIM",
+        model_name="nvidia/nemotron-3.5-bolt-e4b",
+        free_tier=True,
+        actual_cost_per_m_tokens=0.0,
+        commercial_input_per_m=0.150,
+        commercial_output_per_m=0.600,
+    ),
     "meta/llama-3.2-11b-vision-instruct": RateCard(
         provider_name="NVIDIA NIM",
         model_name="meta/llama-3.2-11b-vision-instruct",

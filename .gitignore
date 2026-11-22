@@ -9,6 +9,10 @@ dist/
 *.egg-info/
 .eggs/
 
+# Next.js
+.next
+node_modules
+
 # Virtual environments
 .venv/
 venv/

@@ -315,17 +315,95 @@
       border: 1px solid rgba(139, 92, 246, 0.25);
       border-radius: 12px;
       overflow: hidden;
+      height: 360px;
       box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.8), 0 0 20px rgba(139, 92, 246, 0.1);
     }
-    canvas {
+    #webcamVideo {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: none;
+      z-index: 1;
+    }
+    #skeletonCanvas {
+      position: relative;
       display: block;
       width: 100%;
-      height: 320px;
+      height: 100%;
+      z-index: 2;
     }
+    .hud-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.65rem;
+      margin-bottom: 1rem;
+      padding: 0.75rem 0.9rem;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+    }
+    .hud-control-group {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+    .hud-select {
+      background: rgba(15, 20, 32, 0.9);
+      border: 1px solid var(--card-border);
+      color: var(--text);
+      border-radius: 7px;
+      padding: 0.4rem 0.65rem;
+      font-size: 0.78rem;
+      font-family: inherit;
+      outline: none;
+      cursor: pointer;
+    }
+    .hud-select:focus { border-color: var(--primary); }
+    .btn-camera {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #fff;
+      border: none;
+      padding: 0.48rem 0.95rem;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      box-shadow: 0 2px 10px rgba(16, 185, 129, 0.3);
+      transition: all 0.2s;
+    }
+    .btn-camera:hover { transform: translateY(-1px); }
+    .btn-camera.live {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      box-shadow: 0 2px 10px rgba(239, 68, 68, 0.35);
+    }
+    .auto-speak-label {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.78rem;
+      color: var(--text);
+      cursor: pointer;
+      user-select: none;
+      padding: 0.35rem 0.65rem;
+      border-radius: 7px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+    }
+    .auto-speak-label input { accent-color: var(--primary); cursor: pointer; }
     .hud-overlay-tag {
       position: absolute;
       top: 12px;
       left: 12px;
+      z-index: 3;
       font-family: var(--font-mono);
       font-size: 0.72rem;
       padding: 0.3rem 0.6rem;
@@ -338,6 +416,8 @@
       position: absolute;
       bottom: 12px;
       left: 12px;
+      right: 12px;
+      z-index: 3;
       font-size: 0.75rem;
       font-weight: 600;
       padding: 0.35rem 0.75rem;
@@ -345,11 +425,13 @@
       background: rgba(16, 185, 129, 0.2);
       border: 1px solid #10b981;
       color: #34d399;
+      backdrop-filter: blur(6px);
     }
     .hud-fps-badge {
       position: absolute;
       top: 12px;
       right: 12px;
+      z-index: 3;
       font-family: var(--font-mono);
       font-size: 0.7rem;
       color: var(--text-muted);
@@ -502,12 +584,45 @@
     <section class="hud-card">
       <h2>
         <span>📹 Real-Time Biomechanics HUD (Phase 3B Vision Skeleton)</span>
-        <span style="font-size: 0.75rem; color: #38bdf8; font-weight: normal;">OpenCV / MediaPipe Mock HUD</span>
+        <span id="hudModeTag" style="font-size: 0.75rem; color: #38bdf8; font-weight: normal;">Simulation Mode • Ready for Live Camera</span>
       </h2>
+
+      <div class="hud-toolbar">
+        <button id="liveCameraBtn" class="btn-camera" onclick="toggleLiveCamera()">
+          <span>📷</span> Start Live Camera
+        </button>
+
+        <div class="hud-control-group">
+          <label for="asanaSelect">Target Asana:</label>
+          <select id="asanaSelect" class="hud-select" onchange="onAsanaConfigChange()">
+            <option value="Virabhadrasana II" selected>Virabhadrasana II (Warrior II)</option>
+            <option value="Tadasana">Tadasana (Mountain Pose)</option>
+            <option value="Vrikshasana">Vrikshasana (Tree Pose)</option>
+            <option value="Utkatasana">Utkatasana (Chair Pose)</option>
+            <option value="Bhujangasana">Bhujangasana (Cobra Pose)</option>
+          </select>
+        </div>
+
+        <div class="hud-control-group">
+          <label for="leadLegSelect">Lead Leg:</label>
+          <select id="leadLegSelect" class="hud-select" onchange="onAsanaConfigChange()">
+            <option value="left" selected>Left</option>
+            <option value="right">Right</option>
+          </select>
+        </div>
+
+        <label class="auto-speak-label" title="Automatically speak real-time corrective voice cues">
+          <input type="checkbox" id="autoSpeakToggle" checked>
+          <span>🔊 Voice Guidance Auto-Speak</span>
+        </label>
+      </div>
+
       <div class="hud-layout">
         <div class="canvas-wrapper">
-          <canvas id="skeletonCanvas" width="640" height="340"></canvas>
-          <div class="hud-overlay-tag">CAMERA 01 • 1080p @ 30FPS</div>
+          <video id="webcamVideo" autoplay playsinline muted></video>
+          <canvas id="skeletonCanvas" width="640" height="360"></canvas>
+          <canvas id="captureCanvas" width="640" height="480" style="display:none;"></canvas>
+          <div class="hud-overlay-tag" id="hudCamTag">SIMULATION • 480p WIREFRAME</div>
           <div class="hud-status-badge" id="hudStatusBadge">🟢 VIRABHADRASANA II • OPTIMAL ALIGNMENT</div>
           <div class="hud-fps-badge" id="hudFpsBadge">Latency: 14.2ms | Conf: 98.4%</div>
         </div>
@@ -518,19 +633,19 @@
             <span class="metric-val" id="poseNameVal">Virabhadrasana II (Warrior II)</span>
           </div>
           <div class="metric-row">
-            <span class="metric-label">Lead Knee Flexion</span>
+            <span class="metric-label" id="metric1Label">Lead Knee Flexion</span>
             <span class="metric-val ok" id="kneeAngleVal">91.8° (Target: 90° ± 5°)</span>
           </div>
           <div class="metric-row">
-            <span class="metric-label">Pelvic Alignment</span>
-            <span class="metric-val ok" id="pelvicVal">178.6° (Target: 180°)</span>
+            <span class="metric-label" id="metric2Label">Rear Knee / Symmetry</span>
+            <span class="metric-val ok" id="pelvicVal">178.6° (Target: 170–180°)</span>
           </div>
           <div class="metric-row">
-            <span class="metric-label">Torso Verticality</span>
-            <span class="metric-val ok" id="torsoVal">89.4° (Target: 90°)</span>
+            <span class="metric-label" id="metric3Label">Torso Verticality</span>
+            <span class="metric-val ok" id="torsoVal">2.1° (Target: ≤ 8°)</span>
           </div>
           <div class="metric-row">
-            <span class="metric-label">Event Bus Integration</span>
+            <span class="metric-label">Event Bus / Vision WS</span>
             <span class="metric-val ok" id="eventBusStatus">Active Listener</span>
           </div>
 
@@ -634,10 +749,17 @@
         btn.innerHTML = '🔴 Listening...';
       };
 
-      recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
+      recognition.onresult = async (event) => {
+        const transcript = event.results[0][0].transcript.trim();
+        if (handleHandsFreeVoiceCommand(transcript)) {
+          return;
+        }
         document.getElementById('userInput').value = transcript;
-        checkInputSecurity();
+        await checkInputSecurity();
+        const secBadge = document.getElementById('securityBadge');
+        if (transcript.split(/\s+/).length >= 4 && (!secBadge || !secBadge.classList.contains('danger'))) {
+          generatePractice();
+        }
       };
 
       recognition.onerror = () => stopVoiceInput();
@@ -751,16 +873,478 @@
     }
 
     // -----------------------------------------------------------------------
-    // Real-Time Biomechanics HUD Canvas Simulation (Phase 3B)
+    // Real-Time Biomechanics HUD: Live Webcam + WS /ws/vision + Simulation
     // -----------------------------------------------------------------------
     const canvas = document.getElementById('skeletonCanvas');
     const ctx = canvas.getContext('2d');
+    const captureCanvas = document.getElementById('captureCanvas');
+    const captureCtx = captureCanvas.getContext('2d');
+    const webcamVideo = document.getElementById('webcamVideo');
+
     let showAngles = true;
     let isDeviated = false;
     let animFrame = null;
     let animTick = 0;
 
+    // Live camera & WebSocket state
+    let liveCameraActive = false;
+    let mediaStream = null;
+    let visionWs = null;
+    let frameTimer = null;
+    let wsInFlight = false;
+    let latestLiveTelemetry = null;
+    const spokenEventIds = new Set();
+
+    // Standard MediaPipe 33-point skeletal connections
+    const MP_CONNECTIONS = [
+      [11, 12], [11, 23], [12, 24], [23, 24],
+      [11, 13], [13, 15], [12, 14], [14, 16],
+      [23, 25], [25, 27], [24, 26], [26, 28],
+      [27, 29], [29, 31], [28, 30], [30, 32],
+      [0, 11], [0, 12]
+    ];
+
+    function getSelectedAsana() {
+      const sel = document.getElementById('asanaSelect');
+      return sel ? sel.value : 'Virabhadrasana II';
+    }
+
+    function getSelectedLeadLeg() {
+      const sel = document.getElementById('leadLegSelect');
+      return sel ? sel.value : 'left';
+    }
+
+    function isAutoSpeakEnabled() {
+      const cb = document.getElementById('autoSpeakToggle');
+      return cb ? cb.checked : true;
+    }
+
+    function unlockBrowserAudio() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) {
+          const ac = new AudioCtx();
+          if (ac.state === 'suspended') ac.resume();
+          const osc = ac.createOscillator();
+          const gain = ac.createGain();
+          gain.gain.value = 0.0001;
+          osc.connect(gain);
+          gain.connect(ac.destination);
+          osc.start(0);
+          osc.stop(ac.currentTime + 0.02);
+        }
+      } catch (e) { /* ignore */ }
+    }
+
+    function sendVisionConfig() {
+      const asana = getSelectedAsana();
+      const leadLeg = getSelectedLeadLeg();
+      document.getElementById('poseNameVal').innerText = asana;
+      if (visionWs && visionWs.readyState === WebSocket.OPEN) {
+        visionWs.send(JSON.stringify({
+          type: 'config',
+          asana: asana,
+          lead_leg: leadLeg,
+          user_id: 'StudioUser'
+        }));
+      }
+    }
+
+    function onAsanaConfigChange() {
+      sendVisionConfig();
+      if (!liveCameraActive) {
+        const asana = getSelectedAsana();
+        const badge = document.getElementById('hudStatusBadge');
+        badge.innerText = `🟢 ${asana.toUpperCase()} • SIMULATION READY`;
+        badge.style.borderColor = '#10b981';
+        badge.style.color = '#34d399';
+        badge.style.background = 'rgba(16, 185, 129, 0.2)';
+      }
+    }
+
+    function handleHandsFreeVoiceCommand(transcript) {
+      const lower = transcript.toLowerCase();
+      const poseMap = [
+        { keys: ['warrior 2', 'warrior ii', 'warrior two', 'virabhadrasana'], asana: 'Virabhadrasana II' },
+        { keys: ['mountain', 'tadasana'], asana: 'Tadasana' },
+        { keys: ['tree pose', 'tree', 'vrikshasana'], asana: 'Vrikshasana' },
+        { keys: ['chair pose', 'chair', 'utkatasana'], asana: 'Utkatasana' },
+        { keys: ['cobra pose', 'cobra', 'bhujangasana'], asana: 'Bhujangasana' },
+      ];
+
+      let matchedAsana = null;
+      for (const entry of poseMap) {
+        if (entry.keys.some(k => lower.includes(k))) {
+          matchedAsana = entry.asana;
+          break;
+        }
+      }
+
+      let matchedLeg = null;
+      if (lower.includes('left leg') || lower.includes('left side')) matchedLeg = 'left';
+      if (lower.includes('right leg') || lower.includes('right side')) matchedLeg = 'right';
+
+      const isShortCommand = transcript.split(/\s+/).length <= 7 || lower.startsWith('switch') || lower.startsWith('change') || liveCameraActive;
+      if ((matchedAsana || matchedLeg) && isShortCommand) {
+        if (matchedAsana) {
+          document.getElementById('asanaSelect').value = matchedAsana;
+        }
+        if (matchedLeg) {
+          document.getElementById('leadLegSelect').value = matchedLeg;
+        }
+        onAsanaConfigChange();
+        const announcement = matchedAsana
+          ? `Switched target pose to ${matchedAsana}${matchedLeg ? ` with ${matchedLeg} lead leg` : ''}.`
+          : `Switched lead leg to ${matchedLeg}.`;
+        speakOrPlayCue(announcement, null, true);
+        return true;
+      }
+      return false;
+    }
+
+    async function toggleLiveCamera() {
+      if (liveCameraActive) {
+        stopLiveCamera();
+      } else {
+        await startLiveCamera();
+      }
+    }
+
+    async function startLiveCamera() {
+      unlockBrowserAudio();
+      const btn = document.getElementById('liveCameraBtn');
+      const modeTag = document.getElementById('hudModeTag');
+      const camTag = document.getElementById('hudCamTag');
+      const statusEl = document.getElementById('eventBusStatus');
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert('Camera access (getUserMedia) is not supported in this browser.');
+        return;
+      }
+
+      try {
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Starting Camera...';
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 640 }, height: { ideal: 480 } },
+          audio: false
+        });
+        webcamVideo.srcObject = mediaStream;
+        await webcamVideo.play();
+        webcamVideo.style.display = 'block';
+
+        liveCameraActive = true;
+        wsInFlight = false;
+        latestLiveTelemetry = null;
+        if (animFrame) {
+          cancelAnimationFrame(animFrame);
+          animFrame = null;
+        }
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        btn.disabled = false;
+        btn.classList.add('live');
+        btn.innerHTML = '<span>⏹</span> Stop Camera';
+        if (modeTag) modeTag.innerText = 'Live Webcam • MediaPipe WS /ws/vision';
+        if (camTag) camTag.innerText = 'LIVE WEBCAM • 480p @ ~6 FPS';
+
+        const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        visionWs = new WebSocket(`${wsProto}//${window.location.host}/ws/vision`);
+
+        visionWs.onopen = () => {
+          if (statusEl) {
+            statusEl.innerText = 'Vision WS Connected';
+            statusEl.className = 'metric-val ok';
+          }
+          sendVisionConfig();
+          // Stream 480p JPEG frames at ~6 FPS (~166ms), skipping if previous frame is still in-flight
+          frameTimer = setInterval(captureAndSendFrame, 166);
+        };
+
+        visionWs.onmessage = (event) => {
+          wsInFlight = false;
+          try {
+            const msg = JSON.parse(event.data);
+            if (msg.type === 'telemetry') {
+              latestLiveTelemetry = msg;
+              drawLiveSkeleton(msg);
+              updateLiveTelemetryUI(msg);
+              if (Array.isArray(msg.fired_cues) && msg.fired_cues.length > 0) {
+                msg.fired_cues.forEach(cue => handleFiredCue(cue, msg.asana));
+              }
+            }
+          } catch (err) {
+            console.warn('Vision WS parse error:', err);
+          }
+        };
+
+        visionWs.onerror = () => {
+          wsInFlight = false;
+          if (statusEl) {
+            statusEl.innerText = 'Vision WS Error';
+            statusEl.className = 'metric-val warn';
+          }
+        };
+
+        visionWs.onclose = () => {
+          wsInFlight = false;
+          if (liveCameraActive && statusEl) {
+            statusEl.innerText = 'Vision WS Closed';
+            statusEl.className = 'metric-val warn';
+          }
+        };
+      } catch (err) {
+        btn.disabled = false;
+        btn.classList.remove('live');
+        btn.innerHTML = '<span>📷</span> Start Live Camera';
+        alert(`Could not start webcam: ${err.message}`);
+      }
+    }
+
+    function stopLiveCamera() {
+      liveCameraActive = false;
+      wsInFlight = false;
+      latestLiveTelemetry = null;
+
+      if (frameTimer) {
+        clearInterval(frameTimer);
+        frameTimer = null;
+      }
+      if (visionWs) {
+        try { visionWs.close(); } catch (e) { /* ignore */ }
+        visionWs = null;
+      }
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(t => t.stop());
+        mediaStream = null;
+      }
+      webcamVideo.srcObject = null;
+      webcamVideo.style.display = 'none';
+
+      const btn = document.getElementById('liveCameraBtn');
+      const modeTag = document.getElementById('hudModeTag');
+      const camTag = document.getElementById('hudCamTag');
+      const statusEl = document.getElementById('eventBusStatus');
+
+      btn.classList.remove('live');
+      btn.innerHTML = '<span>📷</span> Start Live Camera';
+      if (modeTag) modeTag.innerText = 'Simulation Mode • Ready for Live Camera';
+      if (camTag) camTag.innerText = 'SIMULATION • 480p WIREFRAME';
+      if (statusEl) {
+        statusEl.innerText = sseConnected ? 'Live SSE Connected' : 'Active Listener';
+        statusEl.className = 'metric-val ok';
+      }
+
+      resetToOptimal();
+      if (!animFrame) {
+        drawHUD();
+      }
+    }
+
+    function captureAndSendFrame() {
+      if (!liveCameraActive || wsInFlight || !visionWs || visionWs.readyState !== WebSocket.OPEN) {
+        return;
+      }
+      if (!webcamVideo.videoWidth || !webcamVideo.videoHeight) {
+        return;
+      }
+      const targetW = Math.min(640, webcamVideo.videoWidth);
+      const targetH = Math.min(480, Math.round(targetW * (webcamVideo.videoHeight / webcamVideo.videoWidth)));
+      captureCanvas.width = targetW;
+      captureCanvas.height = targetH;
+      captureCtx.drawImage(webcamVideo, 0, 0, targetW, targetH);
+      const dataUrl = captureCanvas.toDataURL('image/jpeg', 0.65);
+
+      wsInFlight = true;
+      visionWs.send(JSON.stringify({
+        type: 'frame',
+        image: dataUrl,
+        asana: getSelectedAsana(),
+        lead_leg: getSelectedLeadLeg()
+      }));
+    }
+
+    function mapJointNameToLandmarkIdx(jointName, leadLeg) {
+      const isLeft = leadLeg === 'left';
+      const map = {
+        lead_knee: isLeft ? 25 : 26,
+        rear_knee: isLeft ? 26 : 25,
+        standing_knee: isLeft ? 25 : 26,
+        bent_knee: isLeft ? 26 : 25,
+        left_knee: 25,
+        right_knee: 26,
+        left_elbow: 13,
+        right_elbow: 14,
+        shoulder_level: 11,
+        hip_level: 23,
+        spine_verticality: 12
+      };
+      return map[jointName];
+    }
+
+    function drawLiveSkeleton(telemetry) {
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+
+      if (!telemetry || !telemetry.pose_detected || !Array.isArray(telemetry.landmarks) || telemetry.landmarks.length === 0) {
+        return;
+      }
+
+      const lms = telemetry.landmarks;
+      const leadLeg = getSelectedLeadLeg();
+
+      // Build severity lookup by landmark index
+      const lmSeverity = {};
+      const lmAngleText = {};
+      (telemetry.deviations || []).forEach(dev => {
+        const idx = mapJointNameToLandmarkIdx(dev.joint_name, leadLeg);
+        if (idx !== undefined) {
+          lmSeverity[idx] = dev.is_aligned ? 'ok' : dev.severity;
+          lmAngleText[idx] = `${Math.round(dev.measured_angle)}°`;
+        }
+      });
+
+      // Draw bones
+      ctx.lineWidth = 3;
+      ctx.shadowBlur = 8;
+      MP_CONNECTIONS.forEach(([i1, i2]) => {
+        const p1 = lms[i1];
+        const p2 = lms[i2];
+        if (!p1 || !p2 || p1.visibility < 0.35 || p2.visibility < 0.35) return;
+        const sev = lmSeverity[i1] || lmSeverity[i2];
+        if (sev === 'severe' || sev === 'moderate') {
+          ctx.strokeStyle = '#ef4444';
+          ctx.shadowColor = '#ef4444';
+        } else if (sev === 'mild') {
+          ctx.strokeStyle = '#f59e0b';
+          ctx.shadowColor = '#f59e0b';
+        } else {
+          ctx.strokeStyle = '#10b981';
+          ctx.shadowColor = '#10b981';
+        }
+        ctx.beginPath();
+        ctx.moveTo(p1.x * w, p1.y * h);
+        ctx.lineTo(p2.x * w, p2.y * h);
+        ctx.stroke();
+      });
+
+      // Draw 33 landmark joints
+      lms.forEach((pt, idx) => {
+        if (!pt || pt.visibility < 0.35) return;
+        const x = pt.x * w;
+        const y = pt.y * h;
+        const sev = lmSeverity[idx];
+        let color = '#10b981';
+        let radius = 4.5;
+        if (sev === 'severe' || sev === 'moderate') {
+          color = '#ef4444';
+          radius = 7;
+        } else if (sev === 'mild') {
+          color = '#f59e0b';
+          radius = 6;
+        }
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.shadowColor = color;
+        ctx.fill();
+
+        if (showAngles && lmAngleText[idx]) {
+          ctx.shadowBlur = 0;
+          ctx.font = 'bold 12px JetBrains Mono';
+          ctx.fillStyle = color;
+          ctx.fillText(lmAngleText[idx], x + 10, y - 8);
+          ctx.shadowBlur = 8;
+        }
+      });
+      ctx.shadowBlur = 0;
+    }
+
+    function updateLiveTelemetryUI(telemetry) {
+      const fpsBadge = document.getElementById('hudFpsBadge');
+      const statusBadge = document.getElementById('hudStatusBadge');
+      const poseVal = document.getElementById('poseNameVal');
+      const m1Label = document.getElementById('metric1Label');
+      const m2Label = document.getElementById('metric2Label');
+      const m3Label = document.getElementById('metric3Label');
+      const v1 = document.getElementById('kneeAngleVal');
+      const v2 = document.getElementById('pelvicVal');
+      const v3 = document.getElementById('torsoVal');
+
+      if (poseVal && telemetry.asana) poseVal.innerText = telemetry.asana;
+      if (fpsBadge) {
+        fpsBadge.innerText = `Latency: ${telemetry.latency_ms}ms | Pose: ${telemetry.pose_detected ? 'LOCKED' : 'SEARCHING'}`;
+      }
+
+      if (!telemetry.pose_detected) {
+        statusBadge.innerText = `🔍 ${(telemetry.asana || 'POSE').toUpperCase()} • STEP INTO FRAME FOR SKELETON LOCK`;
+        statusBadge.style.borderColor = '#38bdf8';
+        statusBadge.style.color = '#7dd3fc';
+        statusBadge.style.background = 'rgba(56, 189, 248, 0.16)';
+        return;
+      }
+
+      const devs = telemetry.deviations || [];
+      const setMetricRow = (labelEl, valEl, dev, fallbackLabel, fallbackVal) => {
+        if (dev) {
+          labelEl.innerText = dev.joint_name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+          valEl.innerText = `${dev.measured_angle.toFixed(1)}° (Target: ${dev.target_min}–${dev.target_max}°)`;
+          valEl.className = dev.is_aligned ? 'metric-val ok' : 'metric-val warn';
+        } else {
+          labelEl.innerText = fallbackLabel;
+          valEl.innerText = fallbackVal;
+          valEl.className = 'metric-val ok';
+        }
+      };
+
+      const angles = telemetry.angles || {};
+      setMetricRow(m1Label, v1, devs[0], 'Left Knee', `${angles.left_knee ?? '--'}°`);
+      setMetricRow(m2Label, v2, devs[1], 'Right Knee', `${angles.right_knee ?? '--'}°`);
+      setMetricRow(m3Label, v3, devs[2], 'Spine Verticality', `${angles.spine_verticality ?? '--'}°`);
+
+      const worst = devs.find(d => !d.is_aligned);
+      if (worst) {
+        statusBadge.innerText = `⚠️ ${telemetry.asana.toUpperCase()} • ${worst.joint_name.replace(/_/g, ' ').toUpperCase()}: ${worst.correction_cue}`;
+        statusBadge.style.borderColor = worst.severity === 'severe' ? '#ef4444' : '#f59e0b';
+        statusBadge.style.color = worst.severity === 'severe' ? '#f87171' : '#fbbf24';
+        statusBadge.style.background = worst.severity === 'severe' ? 'rgba(239, 68, 68, 0.22)' : 'rgba(245, 158, 11, 0.2)';
+      } else {
+        statusBadge.innerText = `🟢 ${telemetry.asana.toUpperCase()} • OPTIMAL ALIGNMENT`;
+        statusBadge.style.borderColor = '#10b981';
+        statusBadge.style.color = '#34d399';
+        statusBadge.style.background = 'rgba(16, 185, 129, 0.2)';
+      }
+    }
+
+    function handleFiredCue(cue, asanaName) {
+      if (!cue) return;
+      if (cue.event_id) {
+        if (spokenEventIds.has(cue.event_id)) return;
+        spokenEventIds.add(cue.event_id);
+        if (spokenEventIds.size > 100) {
+          const first = spokenEventIds.values().next().value;
+          spokenEventIds.delete(first);
+        }
+      }
+      const badge = document.getElementById('hudStatusBadge');
+      badge.innerText = `🗣️ ${(asanaName || getSelectedAsana()).toUpperCase()} • ${cue.correction_cue}`;
+      badge.style.borderColor = '#f59e0b';
+      badge.style.color = '#fbbf24';
+      badge.style.background = 'rgba(245, 158, 11, 0.24)';
+
+      if (isAutoSpeakEnabled()) {
+        speakOrPlayCue(cue.correction_cue, cue.audio_url);
+      } else {
+        currentCueText = cue.correction_cue || '';
+        currentAudioUrl = cue.audio_url || null;
+        document.getElementById('audioPlayerBar').style.display = 'flex';
+        document.getElementById('audioCueText').innerText = `"${currentCueText}"`;
+      }
+    }
+
     function drawHUD() {
+      if (liveCameraActive) return;
       animTick += 0.03;
       const w = canvas.width;
       const h = canvas.height;
@@ -901,12 +1485,16 @@
     let sseConnected = false;
     let sseReconnectTimer = null;
 
-    function speakOrPlayCue(text, audioUrl) {
+    function speakOrPlayCue(text, audioUrl, forceSpeak = false) {
       if (!text && !audioUrl) return;
       currentCueText = text || "";
       currentAudioUrl = audioUrl || null;
       document.getElementById('audioPlayerBar').style.display = 'flex';
       document.getElementById('audioCueText').innerText = text ? `"${text}"` : 'Audio cue ready';
+
+      if (!forceSpeak && !isAutoSpeakEnabled()) {
+        return;
+      }
 
       if (audioUrl) {
         const audio = new Audio(audioUrl);
@@ -926,6 +1514,12 @@
     }
 
     function applyPostureDeviationEvent(data) {
+      if (data.event_id && spokenEventIds.has(data.event_id)) {
+        return;
+      }
+      if (data.event_id) {
+        spokenEventIds.add(data.event_id);
+      }
       isDeviated = true;
       const badge = document.getElementById('hudStatusBadge');
       const poseLabel = (data.pose_name || 'POSTURE').toUpperCase();

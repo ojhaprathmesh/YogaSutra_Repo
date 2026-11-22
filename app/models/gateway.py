@@ -4,7 +4,7 @@ app/models/gateway.py — Unified Multi-Provider Model Gateway
 Provides seamless, standardized access across:
 1. Google Gemini (AI Studio free tier: gemini-3.5-flash-lite, gemini-3.1-flash-lite)
 2. Ollama Cloud API (gpt-oss:120b, gemma4:31b, nemotron-3-nano:30b)
-3. NVIDIA NIM API (meta/llama-3.2-11b-vision-instruct, etc.)
+3. NVIDIA NIM API (nvidia/nemotron-3.5-bolt-e4b, etc.)
 
 Normalizes outputs, token metrics, and latency across providers with zero external dependencies.
 """
@@ -24,6 +24,8 @@ from app.models.cache import response_cache
 from app.models.rate_limiter import rate_limiter
 
 logger = logging.getLogger("yogasutra.gateway")
+
+DEFAULT_NVIDIA_MODEL = os.environ.get("NVIDIA_MODEL", "nvidia/nemotron-3.5-bolt-e4b")
 
 
 def _make_ssl_context() -> ssl.SSLContext:
@@ -72,12 +74,22 @@ class ModelGateway:
         """
         # Determine provider and model defaults
         if not provider:
-            if model and ("gemini" in model.lower()):
+            model_lower = model.lower() if model else ""
+            if model and ("gemini" in model_lower):
                 provider = "gemini"
-            elif model and ("gpt-oss" in model.lower() or "gemma" in model.lower() or "nemotron" in model.lower()):
-                provider = "ollama"
-            elif model and ("llama" in model.lower() or "mistral" in model.lower() or "nvidia" in model.lower()):
+            elif model and (
+                "nvidia/" in model_lower
+                or "llama" in model_lower
+                or "mistral" in model_lower
+                or "nvidia" in model_lower
+            ):
                 provider = "nvidia"
+            elif model and (
+                "gpt-oss" in model_lower
+                or "gemma" in model_lower
+                or "nemotron" in model_lower
+            ):
+                provider = "ollama"
             else:
                 provider = "gemini"
 
@@ -87,7 +99,7 @@ class ModelGateway:
             elif provider == "ollama":
                 model = "gpt-oss:120b"
             elif provider == "nvidia":
-                model = "meta/llama-3.2-11b-vision-instruct"
+                model = DEFAULT_NVIDIA_MODEL
 
         # Check cache
         cache_key = {"provider": provider, "model": model, "prompt": prompt, "system": system_instruction}

@@ -1,8 +1,10 @@
 """
 tests/test_gateway.py — Unit tests for ModelGateway, ModelRouter, and Cache.
 """
+import os
+
 from app.models.cache import ResponseCache
-from app.models.gateway import ModelGateway, ModelResponse
+from app.models.gateway import DEFAULT_NVIDIA_MODEL, ModelGateway, ModelResponse
 from app.models.rate_limiter import TokenBucketRateLimiter
 from app.models.router import ModelRouter, TaskComplexity
 
@@ -91,3 +93,65 @@ class TestModelRouter:
         # Should have fallen over to ollama or nvidia
         assert resp.provider != "gemini"
         assert "Fallback response" in resp.content
+
+    def test_router_uses_default_nvidia_model(self):
+        router = ModelRouter()
+        for complexity in (TaskComplexity.FAST, TaskComplexity.REASONING, TaskComplexity.MULTIMODAL):
+            nvidia_entries = [c for c in router.routing_chains[complexity] if c["provider"] == "nvidia"]
+            assert len(nvidia_entries) == 1
+            assert nvidia_entries[0]["model"] == DEFAULT_NVIDIA_MODEL
+
+    def test_router_fallback_to_nvidia_uses_default_model(self):
+        called: list[tuple[str | None, str | None]] = []
+
+        class MockGateway(ModelGateway):
+            def generate(self, prompt, system_instruction="", model=None, provider=None, **_kwargs):
+                called.append((provider, model))
+                if provider != "nvidia":
+                    raise RuntimeError(f"{provider} unavailable")
+                return ModelResponse(content="ok", model=model or "", provider=provider or "")
+
+        router = ModelRouter(gateway=MockGateway())
+        resp = router.route_and_generate(prompt="Test fallback", complexity=TaskComplexity.FAST)
+        assert resp.provider == "nvidia"
+        assert resp.model == DEFAULT_NVIDIA_MODEL
+        assert ("nvidia", DEFAULT_NVIDIA_MODEL) in called
+
+
+class TestModelGatewayDefaultsAndRouting:
+    def test_default_nvidia_model_constant(self):
+        expected = os.environ.get("NVIDIA_MODEL", "nvidia/nemotron-3.5-bolt-e4b")
+        assert DEFAULT_NVIDIA_MODEL == expected
+
+    def test_generate_autodetects_nvidia_and_ollama_nemotron(self, monkeypatch):
+        gw = ModelGateway()
+        calls: list[tuple[str, str]] = []
+
+        def fake_nvidia(prompt, system, model, temperature, max_tokens):
+            calls.append(("nvidia", model))
+            return ModelResponse(content="nim", model=model, provider="nvidia")
+
+        def fake_ollama(prompt, system, model, temperature, max_tokens):
+            calls.append(("ollama", model))
+            return ModelResponse(content="ollama", model=model, provider="ollama")
+
+        monkeypatch.setattr(gw, "_call_nvidia", fake_nvidia)
+        monkeypatch.setattr(gw, "_call_ollama", fake_ollama)
+
+        resp_nim = gw.generate("hello", model="nvidia/nemotron-3.5-bolt-e4b", use_cache=False)
+        assert resp_nim.provider == "nvidia"
+        assert resp_nim.model == "nvidia/nemotron-3.5-bolt-e4b"
+
+        resp_ollama = gw.generate("hello", model="nemotron-3-nano:30b", use_cache=False)
+        assert resp_ollama.provider == "ollama"
+        assert resp_ollama.model == "nemotron-3-nano:30b"
+
+        resp_default = gw.generate("hello", provider="nvidia", use_cache=False)
+        assert resp_default.provider == "nvidia"
+        assert resp_default.model == DEFAULT_NVIDIA_MODEL
+
+        assert calls == [
+            ("nvidia", "nvidia/nemotron-3.5-bolt-e4b"),
+            ("ollama", "nemotron-3-nano:30b"),
+            ("nvidia", DEFAULT_NVIDIA_MODEL),
+        ]

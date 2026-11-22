@@ -14,14 +14,20 @@ Provides REST and Static UI endpoints for:
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
+import os
+import re
+import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
-from fastapi import FastAPI, HTTPException, Request
+import cv2
+import numpy as np
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from app.audio.elevenlabs import elevenlabs_client
@@ -68,6 +74,7 @@ class PracticeRequest(BaseModel):
     phase: int = 2
     preferred_provider: str | None = None
     prompt_strategy: str = "default"   # "react" | "few_shot" | "cot" | "default"
+    include_audio: bool = True
 
 
 class SynthesisRequest(BaseModel):
@@ -105,9 +112,64 @@ def get_model_status() -> dict[str, Any]:
         "models": {
             "gemini": ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"],
             "ollama_cloud": ["gpt-oss:120b", "gemma4:31b", "nemotron-3-nano:30b"],
-            "nvidia_nim": ["meta/llama-3.2-11b-vision-instruct"],
+            "nvidia_nim": [os.environ.get("NVIDIA_MODEL", "nvidia/nemotron-3.5-bolt-e4b")],
         },
     }
+
+
+def _build_plan_audio_cue_text(result: Any, max_chars: int = 220) -> str:
+    """Extract a calm 1–2 sentence spoken intro cue from an approved practice plan."""
+    candidate_text = ""
+    session_state = getattr(result, "session_state", None)
+    if isinstance(session_state, dict):
+        raw_plan = session_state.get("candidate_plan")
+        plan: dict[str, Any] | None = None
+        if isinstance(raw_plan, dict):
+            plan = raw_plan
+        elif isinstance(raw_plan, str) and raw_plan.strip():
+            cleaned = re.sub(r"^```[a-zA-Z]*\s*|\s*```$", "", raw_plan.strip())
+            try:
+                parsed = json.loads(cleaned)
+                if isinstance(parsed, dict):
+                    plan = parsed
+            except Exception:
+                plan = None
+
+        if plan:
+            summary = plan.get("summary") or plan.get("opening_cue") or plan.get("intro")
+            if isinstance(summary, str) and summary.strip():
+                candidate_text = summary.strip()
+            else:
+                goal = plan.get("goal") or plan.get("title") or plan.get("session_title") or "yoga"
+                duration = plan.get("duration_minutes") or plan.get("total_duration_minutes")
+                seq = plan.get("sequence") or plan.get("poses") or []
+                first_pose = None
+                if isinstance(seq, list) and seq:
+                    first_item = seq[0]
+                    if isinstance(first_item, dict):
+                        first_pose = first_item.get("name") or first_item.get("asana") or first_item.get("pose")
+                    elif isinstance(first_item, str):
+                        first_pose = first_item
+                dur_part = f"{duration}-minute " if duration else ""
+                intro = f"Welcome to your {dur_part}{goal} practice."
+                if first_pose:
+                    intro += f" Take a calm breath as we begin with {first_pose}."
+                candidate_text = intro
+
+    if not candidate_text:
+        raw_resp = getattr(result, "final_response", "") or ""
+        plain = re.sub(r"[#*_`>]+", " ", str(raw_resp))
+        plain = re.sub(r"\s+", " ", plain).strip()
+        if plain:
+            sentences = re.split(r"(?<=[.!?])\s+", plain)
+            candidate_text = " ".join(sentences[:2]).strip()
+
+    candidate_text = re.sub(r"\s+", " ", candidate_text).strip()
+    if len(candidate_text) <= max_chars:
+        return candidate_text
+
+    truncated = candidate_text[: max_chars - 3].rsplit(" ", 1)[0].rstrip(" ,;:-")
+    return f"{truncated}..." if truncated else candidate_text[: max_chars - 3] + "..."
 
 
 @app.post("/api/practice/generate")
@@ -159,6 +221,22 @@ def generate_practice(req: PracticeRequest) -> dict[str, Any]:
             phase=req.phase,
             prompt_strategy=strategy,
         )
+        audio_cue_payload: dict[str, Any] | None = None
+        if req.include_audio:
+            try:
+                cue_text = _build_plan_audio_cue_text(result)
+                if cue_text:
+                    cue = tts_engine.synthesize_cue(text=cue_text)
+                    audio_url = f"/api/audio/file/{Path(cue.audio_path).name}" if cue.audio_path else None
+                    audio_cue_payload = {
+                        "text": cue.text,
+                        "audio_url": audio_url,
+                        "provider": cue.provider,
+                        "voice_name": cue.voice_name,
+                    }
+            except Exception as audio_err:
+                logger.warning("[API] Plan audio cue synthesis failed (non-fatal): %s", audio_err)
+
         return {
             "run_id": result.run_id,
             "session_id": result.session_id,
@@ -166,11 +244,47 @@ def generate_practice(req: PracticeRequest) -> dict[str, Any]:
             "phase": result.phase,
             "prompt_strategy": strategy.value,
             "guardrail": guard.to_dict(),
+            "audio_cue": audio_cue_payload,
             "trace": result.trace.to_dict(),
         }
     except Exception as e:
         logger.error(f"[API] Pipeline error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/audio/stream")
+def stream_speech(req: SynthesisRequest):
+    """Stream synthesized MP3 audio directly via ElevenLabs (or cache), with clean fallback."""
+    clean_text = req.text.strip()
+    if req.prefer_elevenlabs and elevenlabs_client.is_configured and clean_text:
+        stream = elevenlabs_client.synthesize_stream(
+            text=clean_text,
+            voice_id=req.voice_id,
+        )
+        first_chunk = next(stream, None)
+        if first_chunk is not None:
+            def _chunk_iter():
+                yield first_chunk
+                yield from stream
+
+            return StreamingResponse(
+                _chunk_iter(),
+                media_type="audio/mpeg",
+                headers={"Cache-Control": "no-cache"},
+            )
+
+    return JSONResponse(
+        status_code=503,
+        content={
+            "detail": "ElevenLabs audio streaming unavailable",
+            "fallback": {
+                "text": clean_text,
+                "provider": "webspeech",
+                "speaking_rate": 0.88,
+                "voice_name": "Default Calming Voice",
+            },
+        },
+    )
 
 
 @app.post("/api/audio/synthesize")
@@ -491,6 +605,257 @@ def get_dashboard_stats_endpoint() -> dict[str, Any]:
 def serve_dashboard() -> HTMLResponse:
     """Serve interactive Observability & Trace Analytics Dashboard."""
     return HTMLResponse(content=render_dashboard_html())
+
+
+# ---------------------------------------------------------------------------
+# Phase 3B: Real-Time Vision WebSocket Endpoint (/ws/vision)
+# ---------------------------------------------------------------------------
+
+_POSE_DETECTOR: Any = None
+
+
+def _get_pose_detector() -> Any:
+    """Lazy-initialize the MediaPipe PoseDetector singleton."""
+    global _POSE_DETECTOR
+    if _POSE_DETECTOR is None:
+        from app.vision.detector import PoseDetector
+
+        _POSE_DETECTOR = PoseDetector()
+    return _POSE_DETECTOR
+
+
+def _decode_base64_frame(image_data: str, max_width: int = 640, max_height: int = 480) -> np.ndarray | None:
+    """Decode a base64 (or data-URI) JPEG/PNG frame into a 480p-clamped BGR numpy array."""
+    if not image_data or not isinstance(image_data, str):
+        return None
+    try:
+        payload = image_data.split(",", 1)[1] if "," in image_data else image_data
+        raw_bytes = base64.b64decode(payload, validate=False)
+        if not raw_bytes:
+            return None
+        np_arr = np.frombuffer(raw_bytes, dtype=np.uint8)
+        frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        if frame is None or frame.size == 0:
+            return None
+        h, w = frame.shape[:2]
+        if w > max_width or h > max_height:
+            scale = min(max_width / w, max_height / h)
+            frame = cv2.resize(
+                frame,
+                (max(1, int(w * scale)), max(1, int(h * scale))),
+                interpolation=cv2.INTER_AREA,
+            )
+        return frame
+    except Exception:
+        return None
+
+
+@app.websocket("/ws/vision")
+async def vision_websocket(websocket: WebSocket) -> None:
+    """Real-time webcam vision WebSocket for 33-point pose extraction & spoken cues."""
+    from app.agents.pose.agent import PoseAgent
+
+    await websocket.accept()
+
+    asana_name: str = "Virabhadrasana II"
+    lead_leg: Literal["left", "right"] = "left"
+    user_id: str = "P00"
+    pose_agent = PoseAgent(
+        debounce_seconds=1.5,
+        alert_cooldown_seconds=4.0,
+        user_id=user_id,
+    )
+
+    try:
+        while True:
+            try:
+                raw_text = await websocket.receive_text()
+                msg = json.loads(raw_text)
+                if not isinstance(msg, dict):
+                    await websocket.send_json({
+                        "type": "telemetry",
+                        "pose_detected": False,
+                        "asana": asana_name,
+                        "latency_ms": 0.0,
+                        "landmarks": [],
+                        "angles": {},
+                        "deviations": [],
+                        "fired_cues": [],
+                    })
+                    continue
+            except WebSocketDisconnect:
+                break
+            except (ValueError, TypeError):
+                await websocket.send_json({
+                    "type": "telemetry",
+                    "pose_detected": False,
+                    "asana": asana_name,
+                    "latency_ms": 0.0,
+                    "landmarks": [],
+                    "angles": {},
+                    "deviations": [],
+                    "fired_cues": [],
+                })
+                continue
+
+            msg_type = msg.get("type")
+
+            if msg_type == "config":
+                new_asana = msg.get("asana")
+                if isinstance(new_asana, str) and new_asana.strip():
+                    asana_name = new_asana.strip()
+                new_lead = msg.get("lead_leg")
+                if new_lead in ("left", "right"):
+                    lead_leg = new_lead
+                new_uid = msg.get("user_id")
+                if isinstance(new_uid, str) and new_uid.strip():
+                    user_id = new_uid.strip()
+                    pose_agent.user_id = user_id
+                if isinstance(msg.get("debounce_seconds"), (int, float)):
+                    pose_agent.debounce_seconds = max(0.0, float(msg["debounce_seconds"]))
+                if isinstance(msg.get("alert_cooldown_seconds"), (int, float)):
+                    pose_agent.alert_cooldown_seconds = max(0.0, float(msg["alert_cooldown_seconds"]))
+                pose_agent.reset_state()
+                await websocket.send_json({
+                    "type": "config_ack",
+                    "asana": asana_name,
+                    "lead_leg": lead_leg,
+                    "user_id": user_id,
+                })
+                continue
+
+            if msg_type == "frame":
+                t0 = time.perf_counter()
+
+                frame_asana = msg.get("asana")
+                if isinstance(frame_asana, str) and frame_asana.strip() and frame_asana.strip() != asana_name:
+                    asana_name = frame_asana.strip()
+                    pose_agent.reset_state()
+
+                frame_lead = msg.get("lead_leg")
+                if frame_lead in ("left", "right") and frame_lead != lead_leg:
+                    lead_leg = frame_lead
+                    pose_agent.reset_state()
+
+                frame = _decode_base64_frame(msg.get("image", ""))
+                if frame is None:
+                    latency_ms = round((time.perf_counter() - t0) * 1000.0, 1)
+                    await websocket.send_json({
+                        "type": "telemetry",
+                        "pose_detected": False,
+                        "asana": asana_name,
+                        "latency_ms": latency_ms,
+                        "landmarks": [],
+                        "angles": {},
+                        "deviations": [],
+                        "fired_cues": [],
+                    })
+                    continue
+
+                try:
+                    detector = _get_pose_detector()
+                    snapshot = await asyncio.to_thread(detector.extract_biomechanics, frame)
+                except Exception as exc:
+                    logger.warning("[WS /ws/vision] Pose extraction failed: %s", exc)
+                    latency_ms = round((time.perf_counter() - t0) * 1000.0, 1)
+                    await websocket.send_json({
+                        "type": "telemetry",
+                        "pose_detected": False,
+                        "asana": asana_name,
+                        "latency_ms": latency_ms,
+                        "landmarks": [],
+                        "angles": {},
+                        "deviations": [],
+                        "fired_cues": [],
+                    })
+                    continue
+
+                if not snapshot or not snapshot.landmarks:
+                    latency_ms = round((time.perf_counter() - t0) * 1000.0, 1)
+                    await websocket.send_json({
+                        "type": "telemetry",
+                        "pose_detected": False,
+                        "asana": asana_name,
+                        "latency_ms": latency_ms,
+                        "landmarks": [],
+                        "angles": {},
+                        "deviations": [],
+                        "fired_cues": [],
+                    })
+                    continue
+
+                deviations, fired_events = pose_agent.evaluate_snapshot(
+                    snapshot,
+                    asana_name=asana_name,
+                    lead_leg=lead_leg,
+                )
+
+                # Build ordered 33-point landmark array
+                max_idx = max(32, max(snapshot.landmarks.keys()))
+                landmarks_list: list[dict[str, Any]] = []
+                for idx in range(max_idx + 1):
+                    pt = snapshot.landmarks.get(idx)
+                    if pt is not None:
+                        landmarks_list.append({
+                            "id": idx,
+                            "x": round(float(pt.x), 4),
+                            "y": round(float(pt.y), 4),
+                            "visibility": round(float(pt.visibility), 3),
+                        })
+                    else:
+                        landmarks_list.append({
+                            "id": idx,
+                            "x": 0.0,
+                            "y": 0.0,
+                            "visibility": 0.0,
+                        })
+
+                deviations_payload = [
+                    {
+                        "joint_name": d.joint_name,
+                        "measured_angle": d.measured_angle,
+                        "target_min": d.target_min,
+                        "target_max": d.target_max,
+                        "deviation_deg": d.deviation_deg,
+                        "is_aligned": d.is_aligned,
+                        "severity": d.severity,
+                        "correction_cue": d.correction_cue,
+                    }
+                    for d in deviations
+                ]
+
+                fired_cues: list[dict[str, Any]] = []
+                if fired_events:
+                    recent_cues = pose_agent.event_bus.get_recent_cue_events(limit=20)
+                    recent_by_id = {
+                        c.get("event_id"): c for c in recent_cues if isinstance(c, dict) and c.get("event_id")
+                    }
+                    for evt in fired_events:
+                        meta = recent_by_id.get(evt.event_id, {})
+                        fired_cues.append({
+                            "event_id": evt.event_id,
+                            "joint_name": evt.joint_name,
+                            "correction_cue": evt.correction_cue,
+                            "severity": evt.severity,
+                            "measured_angle": evt.measured_angle,
+                            "deviation_deg": evt.deviation_deg,
+                            "audio_url": meta.get("audio_url"),
+                            "provider": meta.get("provider", "webspeech"),
+                        })
+
+                latency_ms = round((time.perf_counter() - t0) * 1000.0, 1)
+                await websocket.send_json({
+                    "type": "telemetry",
+                    "pose_detected": True,
+                    "asana": asana_name,
+                    "latency_ms": latency_ms,
+                    "landmarks": landmarks_list,
+                    "angles": snapshot.summary(),
+                    "deviations": deviations_payload,
+                    "fired_cues": fired_cues,
+                })
+    except WebSocketDisconnect:
+        logger.debug("[WS /ws/vision] Client disconnected cleanly.")
 
 
 # ---------------------------------------------------------------------------

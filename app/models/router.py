@@ -12,7 +12,7 @@ from __future__ import annotations
 import enum
 import logging
 
-from app.models.gateway import ModelGateway, ModelResponse, model_gateway
+from app.models.gateway import DEFAULT_NVIDIA_MODEL, ModelGateway, ModelResponse, model_gateway
 
 logger = logging.getLogger("yogasutra.router")
 
@@ -35,16 +35,16 @@ class ModelRouter:
             TaskComplexity.FAST: [
                 {"provider": "gemini", "model": "gemini-3.5-flash-lite"},
                 {"provider": "ollama", "model": "gemma4:31b"},
-                {"provider": "nvidia", "model": "meta/llama-3.2-11b-vision-instruct"},
+                {"provider": "nvidia", "model": DEFAULT_NVIDIA_MODEL},
             ],
             TaskComplexity.REASONING: [
                 {"provider": "ollama", "model": "gpt-oss:120b"},
                 {"provider": "gemini", "model": "gemini-3.5-flash-lite"},
                 {"provider": "ollama", "model": "nemotron-3-nano:30b"},
-                {"provider": "nvidia", "model": "meta/llama-3.2-11b-vision-instruct"},
+                {"provider": "nvidia", "model": DEFAULT_NVIDIA_MODEL},
             ],
             TaskComplexity.MULTIMODAL: [
-                {"provider": "nvidia", "model": "meta/llama-3.2-11b-vision-instruct"},
+                {"provider": "nvidia", "model": DEFAULT_NVIDIA_MODEL},
                 {"provider": "gemini", "model": "gemini-3.5-flash-lite"},
             ],
         }
